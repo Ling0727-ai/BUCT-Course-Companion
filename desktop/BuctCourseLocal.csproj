@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyTitle>北化课程提醒</AssemblyTitle>
+    <ApplicationIcon>Assets\CourseFlow.ico</ApplicationIcon>
+    <WorkerProject>$(MSBuildProjectDirectory)\..\course-worker</WorkerProject>
+    <WorkerOutput>$(MSBuildProjectDirectory)\obj\worker\course-worker.exe</WorkerOutput>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.34" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <PackageReference Include="Ical.Net" Version="5.2.4" />
+    <PackageReference Include="ExcelDataReader" Version="3.9.0" />
+    <PackageReference Include="Docnet.Core" Version="2.6.0" />
+    <PackageReference Include="Tesseract" Version="5.2.0" />
+    <WorkerSource Include="$(WorkerProject)\**\*.go;$(WorkerProject)\go.mod;$(WorkerProject)\go.sum" />
+    <Content Include="$(WorkerOutput)" Link="course-worker.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Resource Include="Assets\CourseFlow.ico" />
+    <Resource Include="Assets\CourseFlow.png" />
+    <Content Include="Assets\Ocr\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="BuildCourseWorker" BeforeTargets="PrepareForBuild" Inputs="@(WorkerSource)" Outputs="$(WorkerOutput)" Condition="'$(DesignTimeBuild)' != 'true'">
+    <MakeDir Directories="$(MSBuildProjectDirectory)\obj\worker" />
+    <Exec WorkingDirectory="$(WorkerProject)" Command="go build -trimpath -o &quot;$(WorkerOutput)&quot; ./cmd/course-worker" EnvironmentVariables="GOOS=windows;GOARCH=amd64;CGO_ENABLED=0" />
+  </Target>
+</Project>

@@ -1,0 +1,433 @@
+<Window x:Class="BuctCourseLocal.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:BuctCourseLocal"
+        xmlns:web="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="北化课程提醒" Width="1160" Height="760" MinWidth="900" MinHeight="580" Icon="Assets/CourseFlow.png"
+        FontFamily="Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI" UseLayoutRounding="True"
+        WindowStartupLocation="CenterScreen" Background="{StaticResource Canvas}">
+  <Window.Resources>
+    <Style x:Key="NavButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Foreground" Value="{StaticResource Ink}" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Padding" Value="12,10" />
+      <Setter Property="Margin" Value="0,0,0,5" />
+      <Setter Property="MinHeight" Value="40" />
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{StaticResource GlassHover}" /></Trigger>
+        <Trigger Property="Tag" Value="Selected">
+          <Setter Property="Background" Value="{StaticResource GlassSelected}" />
+          <Setter Property="BorderBrush" Value="{StaticResource GlassSelectedEdge}" />
+          <Setter Property="Foreground" Value="{StaticResource Accent}" />
+          <Setter Property="FontWeight" Value="SemiBold" />
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+    <Style x:Key="NavIcon" TargetType="TextBlock">
+      <Setter Property="FontFamily" Value="Segoe MDL2 Assets" /><Setter Property="FontSize" Value="16" />
+      <Setter Property="Width" Value="25" /><Setter Property="Margin" Value="0,0,5,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style x:Key="MetricCard" TargetType="Border" BasedOn="{StaticResource FrostedPanel}">
+      <Setter Property="Padding" Value="18,13" />
+    </Style>
+    <Style x:Key="PageTitle" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{StaticResource Ink}" />
+      <Setter Property="FontSize" Value="30" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style x:Key="UrgencyTile" TargetType="ToggleButton">
+      <Setter Property="Background" Value="{StaticResource GlassRaised}" />
+      <Setter Property="BorderBrush" Value="{StaticResource GlassEdge}" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <Border x:Name="Tile" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="1" CornerRadius="18" Padding="17,13">
+              <ContentPresenter />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Tile" Property="BorderBrush" Value="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}}" /></Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Tile" Property="BorderBrush" Value="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}}" />
+                <Setter TargetName="Tile" Property="Background" Value="{Binding Resources[SelectedFill], RelativeSource={RelativeSource TemplatedParent}}" />
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Tile" Property="BorderBrush" Value="{StaticResource Accent}" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="KindChip" TargetType="RadioButton">
+      <Setter Property="Foreground" Value="{StaticResource Muted}" />
+      <Setter Property="Padding" Value="10,5" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RadioButton">
+            <Border x:Name="Chip" CornerRadius="12" Padding="{TemplateBinding Padding}" Background="Transparent"
+                    BorderThickness="1" BorderBrush="Transparent">
+              <ContentPresenter HorizontalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chip" Property="Background" Value="{StaticResource GlassHover}" /></Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Chip" Property="Background" Value="{StaticResource GlassRaised}" />
+                <Setter TargetName="Chip" Property="BorderBrush" Value="{StaticResource GlassEdge}" />
+                <Setter Property="Foreground" Value="{StaticResource Ink}" />
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Chip" Property="BorderBrush" Value="{StaticResource Accent}" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <DataTemplate x:Key="TaskCardTemplate">
+      <Border Style="{StaticResource MetricCard}" Padding="15,11" Margin="0,0,0,7">
+        <Grid>
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+          <StackPanel Margin="0,0,10,0">
+            <TextBlock Text="{Binding Task.Title}" FontWeight="SemiBold" FontSize="17" TextWrapping="Wrap" />
+            <WrapPanel Margin="0,6,0,0">
+              <Border Padding="7,2" CornerRadius="9" Background="{StaticResource GlassChip}" Margin="0,0,8,0">
+                <TextBlock Text="{Binding Task.KindLabel}" Foreground="{StaticResource Ink}" FontSize="12" />
+              </Border>
+              <TextBlock Text="{Binding Task.Subject}" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,12,0" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding Timing}" FontSize="12" VerticalAlignment="Center">
+                <TextBlock.Style>
+                  <Style TargetType="TextBlock">
+                    <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                    <Style.Triggers><DataTrigger Binding="{Binding Overdue}" Value="True"><Setter Property="Foreground" Value="#B42336" /></DataTrigger></Style.Triggers>
+                  </Style>
+                </TextBlock.Style>
+              </TextBlock>
+            </WrapPanel>
+            <Expander Header="查看详情" Visibility="{Binding Task.DetailsVisibility}" Margin="0,7,0,0" Foreground="{StaticResource Muted}">
+              <TextBox Text="{Binding Task.Details, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="180" VerticalScrollBarVisibility="Auto" BorderThickness="0" />
+            </Expander>
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+            <Button Click="Task_Open" DataContext="{Binding Task}" Content="{Binding OpenLabel}" Margin="0,0,7,0" Padding="10,7">
+              <Button.Style>
+                <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                  <Setter Property="Visibility" Value="Collapsed" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsTodo}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                    <DataTrigger Binding="{Binding HasLink}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Button.Style>
+            </Button>
+            <Button Click="Task_Toggle" DataContext="{Binding Task}" Content="{Binding StatusAction}" Padding="10,7" />
+            <Button Click="Task_More" DataContext="{Binding Task}" Content="···" Padding="9,7" Margin="7,0,0,0"
+                    AutomationProperties.Name="更多任务操作" />
+          </StackPanel>
+        </Grid>
+      </Border>
+    </DataTemplate>
+  </Window.Resources>
+  <Grid Background="{StaticResource GlassBackdrop}" ClipToBounds="True" TextElement.Foreground="{StaticResource Ink}">
+    <Grid.ColumnDefinitions><ColumnDefinition Width="223" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+    <Grid Grid.ColumnSpan="2" IsHitTestVisible="False">
+      <Ellipse Width="780" Height="520" Fill="{StaticResource BackdropBlue}" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-230,-200,0,0" />
+      <Ellipse Width="830" Height="680" Fill="{StaticResource BackdropMint}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-340,-205,0" />
+      <Ellipse Width="850" Height="620" Fill="{StaticResource BackdropLilac}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-225,-282" />
+    </Grid>
+    <Border Style="{StaticResource FrostedPanel}" Background="{StaticResource GlassRaised}" CornerRadius="25" Margin="17,18,0,18" Padding="13,18,13,13">
+      <Border.Effect><DropShadowEffect BlurRadius="25" ShadowDepth="4" Color="#6284AC" Opacity="0.19" /></Border.Effect>
+      <DockPanel LastChildFill="False">
+        <StackPanel DockPanel.Dock="Top">
+          <StackPanel Margin="7,0,4,22">
+            <Border Style="{StaticResource FrostedPanel}" Width="48" Height="48" HorizontalAlignment="Left" Padding="4" CornerRadius="15" Margin="0,0,0,12">
+              <Image Source="Assets/CourseFlow.png" />
+            </Border>
+            <TextBlock Text="北化课程提醒" Foreground="{StaticResource Ink}" FontSize="19" FontWeight="SemiBold" />
+            <TextBlock Text="北京化工大学" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" />
+          </StackPanel>
+          <Button x:Name="BoardButton" Style="{StaticResource NavButton}" Click="Board_Click" AutomationProperties.Name="课程与待办"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE80F;" /><TextBlock Text="课程与待办" /></StackPanel></Button>
+          <Button x:Name="CatalogButton" Style="{StaticResource NavButton}" Click="Catalog_Click" AutomationProperties.Name="我的课程"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE82D;" /><TextBlock Text="我的课程" /></StackPanel></Button>
+          <Button x:Name="ScheduleButton" Style="{StaticResource NavButton}" Click="Schedule_Click" AutomationProperties.Name="课表"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE787;" /><TextBlock Text="课表" /></StackPanel></Button>
+          <Button x:Name="PortalButton" Style="{StaticResource NavButton}" Click="Portal_Click" AutomationProperties.Name="打开课程平台"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE774;" /><TextBlock Text="打开课程平台" /></StackPanel></Button>
+          <Button Style="{StaticResource NavButton}" Click="Settings_Click" AutomationProperties.Name="账户与通知"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE713;" /><TextBlock Text="账户与通知" /></StackPanel></Button>
+        </StackPanel>
+        <Border DockPanel.Dock="Bottom" Style="{StaticResource FrostedPanel}" CornerRadius="14" Padding="10,8">
+          <StackPanel>
+            <TextBlock x:Name="AccountStatus" Foreground="{StaticResource Ink}" FontSize="12" TextWrapping="Wrap" />
+            <TextBlock x:Name="NoticeStatus" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,5,0,0" />
+          </StackPanel>
+        </Border>
+      </DockPanel>
+    </Border>
+    <Grid Grid.Column="1" Margin="23,24,23,18">
+      <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+      <Grid x:Name="Board">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <DockPanel Margin="0,0,0,20" LastChildFill="True">
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button Click="ManageFilters_Click" Margin="0,0,8,0">隐藏与回收站</Button>
+            <Button x:Name="SyncButton" Click="Sync_Click" Margin="0,0,8,0">同步课程</Button>
+            <Button Style="{StaticResource PrimaryButton}" Click="AddTodo_Click">＋ 新建待办</Button>
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="课程与待办" Style="{StaticResource PageTitle}" />
+            <TextBlock x:Name="LastSync" Foreground="{StaticResource Muted}" Margin="0,5,0,0" />
+          </StackPanel>
+        </DockPanel>
+        <UniformGrid Grid.Row="1" Columns="3" Margin="0,0,0,18">
+          <ToggleButton x:Name="UrgentFilter" Style="{StaticResource UrgencyTile}" Tag="{x:Static local:TaskUrgency.Urgent}" Click="Urgency_Click"
+                        Foreground="#B42336" Margin="0,0,10,0" AutomationProperties.Name="紧急任务，24 小时内含逾期">
+            <ToggleButton.Resources><SolidColorBrush x:Key="SelectedFill" Color="#FFF1F3" /></ToggleButton.Resources>
+            <StackPanel><TextBlock Text="紧急" FontWeight="SemiBold" /><TextBlock x:Name="UrgentCount" FontSize="25" FontWeight="SemiBold" /><TextBlock Text="24 小时内 · 含逾期" Foreground="{StaticResource Muted}" FontSize="12" /></StackPanel>
+          </ToggleButton>
+          <ToggleButton x:Name="UpcomingFilter" Style="{StaticResource UrgencyTile}" Tag="{x:Static local:TaskUrgency.Upcoming}" Click="Urgency_Click"
+                        Foreground="#8B5204" Margin="0,0,10,0" AutomationProperties.Name="即将到期任务，1 至 3 天内">
+            <ToggleButton.Resources><SolidColorBrush x:Key="SelectedFill" Color="#FFF6E5" /></ToggleButton.Resources>
+            <StackPanel><TextBlock Text="即将到期" FontWeight="SemiBold" /><TextBlock x:Name="UpcomingCount" FontSize="25" FontWeight="SemiBold" /><TextBlock Text="1–3 天内" Foreground="{StaticResource Muted}" FontSize="12" /></StackPanel>
+          </ToggleButton>
+          <ToggleButton x:Name="NormalFilter" Style="{StaticResource UrgencyTile}" Tag="{x:Static local:TaskUrgency.Normal}" Click="Urgency_Click"
+                        Foreground="#126454" AutomationProperties.Name="正常任务，超过 3 天或无截止时间">
+            <ToggleButton.Resources><SolidColorBrush x:Key="SelectedFill" Color="#EAF6F1" /></ToggleButton.Resources>
+            <StackPanel><TextBlock Text="正常" FontWeight="SemiBold" /><TextBlock x:Name="NormalCount" FontSize="25" FontWeight="SemiBold" /><TextBlock Text="超过 3 天或无截止时间" Foreground="{StaticResource Muted}" FontSize="12" /></StackPanel>
+          </ToggleButton>
+        </UniformGrid>
+        <DockPanel Grid.Row="2" Margin="0,0,0,12">
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <CheckBox x:Name="IncludeCompleted" Content="显示已完成" VerticalAlignment="Center" Margin="0,0,14,0" Checked="Filter_Changed" Unchecked="Filter_Changed" />
+            <Border Style="{StaticResource FrostedPanel}" Background="{StaticResource GlassChip}" CornerRadius="14" Padding="2" AutomationProperties.Name="任务类型">
+              <StackPanel Orientation="Horizontal">
+                <RadioButton GroupName="TaskKind" Style="{StaticResource KindChip}" Content="全部" Tag="" IsChecked="True" Checked="Kind_Checked" />
+                <RadioButton x:Name="HomeworkFilter" GroupName="TaskKind" Style="{StaticResource KindChip}" Content="作业" Tag="homework" Checked="Kind_Checked" />
+                <RadioButton GroupName="TaskKind" Style="{StaticResource KindChip}" Content="测试" Tag="test" Checked="Kind_Checked" />
+                <RadioButton GroupName="TaskKind" Style="{StaticResource KindChip}" Content="个人待办" Tag="todo" Checked="Kind_Checked" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+          <TextBlock Text="任务列表" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+        </DockPanel>
+        <Grid Grid.Row="3">
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl x:Name="TaskList">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Margin="0,0,0,9">
+                    <Border Style="{StaticResource FrostedPanel}" Background="{Binding Band.Tint}" CornerRadius="12" Padding="11,6" Margin="0,0,7,7">
+                      <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding Band.Title}" Foreground="{Binding Band.Accent}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Count, StringFormat={}{0} 项}" Foreground="{Binding Band.Accent}" Margin="8,0,0,0" />
+                      </StackPanel>
+                    </Border>
+                    <ItemsControl ItemsSource="{Binding Cards}" ItemTemplate="{StaticResource TaskCardTemplate}" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+          <Border x:Name="Empty" Style="{StaticResource MetricCard}" Padding="18,30" VerticalAlignment="Top">
+            <StackPanel HorizontalAlignment="Center">
+              <Border Width="46" Height="46" Background="{StaticResource GlassSelected}" CornerRadius="15" Margin="0,0,0,12">
+                <TextBlock Text="&#xE73A;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="{StaticResource Accent}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <TextBlock x:Name="EmptyHeadline" Text="暂无任务" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" />
+              <TextBlock x:Name="EmptyHint" TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0" Foreground="{StaticResource Muted}" />
+            </StackPanel>
+          </Border>
+        </Grid>
+      </Grid>
+      <Grid x:Name="CatalogPanel" Visibility="Collapsed">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+        <DockPanel Margin="0,0,0,16">
+          <Button DockPanel.Dock="Right" VerticalAlignment="Center" Click="Catalog_Refresh_Click">刷新课程</Button>
+          <StackPanel>
+            <TextBlock Text="我的课程" Style="{StaticResource PageTitle}" />
+            <TextBlock x:Name="CatalogSummary" Foreground="{StaticResource Muted}" Margin="0,5,0,0" TextWrapping="Wrap" />
+          </StackPanel>
+        </DockPanel>
+        <Grid Grid.Row="1">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="13" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+          <Border Style="{StaticResource MetricCard}" Padding="10">
+            <DockPanel>
+              <TextBox x:Name="CatalogSearch" DockPanel.Dock="Top" Margin="0,0,0,8" TextChanged="CatalogSearch_Changed"
+                       AutomationProperties.Name="搜索课程" />
+              <ListBox x:Name="CatalogList" SelectionChanged="Catalog_SelectionChanged" BorderThickness="0" Background="Transparent"
+                       ItemContainerStyle="{StaticResource GlassListItem}"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="课程列表">
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel Margin="3,6">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding Metadata}" Foreground="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </DockPanel>
+          </Border>
+          <Border Grid.Column="2" Style="{StaticResource MetricCard}" Padding="14">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                <DockPanel>
+                  <Button x:Name="CatalogOpenButton" DockPanel.Dock="Right" Click="Catalog_OpenCourse" IsEnabled="False" Padding="9,6">打开课程页面</Button>
+                  <TextBlock x:Name="CatalogCourseTitle" Text="选择一门课程" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+                </DockPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,9,0,0">
+                  <RadioButton x:Name="HomeworkTab" GroupName="CourseItems" Style="{StaticResource KindChip}" Content="全部作业" Tag="course-homework" IsChecked="True" Checked="CatalogTab_Changed" />
+                  <RadioButton GroupName="CourseItems" Style="{StaticResource KindChip}" Content="测试" Tag="course-tests" Checked="CatalogTab_Changed" />
+                  <CheckBox x:Name="CatalogAvailableOnly" Content="仅可处理" Margin="12,0,0,0" VerticalAlignment="Center" Checked="CatalogAvailable_Changed" Unchecked="CatalogAvailable_Changed" />
+                  <Button Click="Catalog_ReloadItems" Padding="8,4" Margin="12,0,0,0">刷新列表</Button>
+                </StackPanel>
+                <TextBlock x:Name="CatalogEntryNote" Foreground="{StaticResource Muted}" Margin="0,8,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+              <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl x:Name="CatalogEntries">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="0,8,5,9">
+                        <StackPanel>
+                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                          <TextBlock Text="{Binding Timing}" Foreground="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,3,0,6" />
+                          <WrapPanel>
+                            <Button Click="Catalog_ItemDetail" IsEnabled="{Binding HasDetail}" Padding="7,4" Margin="0,0,6,0">查看详情</Button>
+                            <Button Click="Catalog_ItemOpen" Content="{Binding OpenLabel}" Padding="7,4" Margin="0,0,6,0" />
+                            <Button Click="Catalog_ItemResult" IsEnabled="{Binding HasResult}" Padding="7,4" Margin="0,0,6,0">查看结果</Button>
+                            <Button Click="Catalog_ItemHide" Padding="7,4">隐藏</Button>
+                          </WrapPanel>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </DockPanel>
+          </Border>
+        </Grid>
+      </Grid>
+      <Grid x:Name="SchedulePanel" Visibility="Collapsed">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+        <DockPanel Margin="0,0,0,14">
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button Click="Schedule_Import" Margin="0,0,6,0">导入</Button>
+            <Button Click="Schedule_Export" Margin="0,0,6,0">导出</Button>
+            <Button Click="Schedule_Settings" Margin="0,0,6,0">学期与作息</Button>
+            <Button Click="Schedule_Add" Style="{StaticResource PrimaryButton}">＋ 新建</Button>
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="课表" Style="{StaticResource PageTitle}" />
+            <TextBlock x:Name="ScheduleTerm" Foreground="{StaticResource Muted}" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DockPanel>
+        <Border Grid.Row="1" Style="{StaticResource MetricCard}" Padding="12,8" Margin="0,0,0,11">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+              <Button Click="Schedule_Manage" Padding="8,5" Margin="0,0,9,0">全部课程与考试</Button>
+              <Button Click="Schedule_Week" Tag="-1" Padding="8,5" Margin="0,0,5,0" AutomationProperties.Name="上一周">‹</Button>
+              <Button Click="Schedule_Today" Padding="9,5" Margin="0,0,5,0">本周</Button>
+              <Button Click="Schedule_Week" Tag="1" Padding="8,5" AutomationProperties.Name="下一周">›</Button>
+            </StackPanel>
+            <StackPanel VerticalAlignment="Center">
+              <TextBlock x:Name="ScheduleWeekLabel" FontWeight="SemiBold" />
+              <TextBlock x:Name="ScheduleNext" FontSize="12" Foreground="{StaticResource Muted}" Margin="0,2,8,0" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </DockPanel>
+        </Border>
+        <TextBlock x:Name="CourseFlowStatus" Grid.Row="2" Foreground="{StaticResource Muted}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+        <ScrollViewer x:Name="ScheduleScroller" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+          <ItemsControl x:Name="ScheduleDays" Width="{Binding ViewportWidth, ElementName=ScheduleScroller}" MinWidth="600" Margin="0,0,0,6">
+            <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="7" Rows="1" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource FrostedPanel}" CornerRadius="14" Margin="0,0,5,0" MinHeight="175">
+                  <StackPanel>
+                    <Border Padding="6,8" CornerRadius="13,13,0,0">
+                      <Border.Style>
+                        <Style TargetType="Border">
+                          <Setter Property="Background" Value="{StaticResource GlassChip}" />
+                          <Style.Triggers><DataTrigger Binding="{Binding Today}" Value="True"><Setter Property="Background" Value="{StaticResource GlassSelected}" /></DataTrigger></Style.Triggers>
+                        </Style>
+                      </Border.Style>
+                      <StackPanel>
+                        <TextBlock Text="{Binding DayLabel}" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        <TextBlock Text="{Binding ShortDate}" FontSize="12" Foreground="{StaticResource Muted}" HorizontalAlignment="Center" />
+                      </StackPanel>
+                    </Border>
+                    <TextBlock Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="6,4,6,0" FontSize="11">
+                      <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                          <Setter Property="Text" Value="{Binding ExceptionLabel}" />
+                          <Style.Triggers><DataTrigger Binding="{Binding ExceptionLabel}" Value=""><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
+                        </Style>
+                      </TextBlock.Style>
+                    </TextBlock>
+                    <ItemsControl ItemsSource="{Binding Entries}" Margin="5,6,5,6">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <Button Click="Schedule_OpenEntry" HorizontalContentAlignment="Stretch" Padding="6,5" Margin="0,0,0,5">
+                            <Button.Style>
+                              <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Setter Property="Background" Value="{StaticResource CourseFill}" />
+                                <Setter Property="BorderBrush" Value="{StaticResource GlassEdge}" />
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding Color}" Value="blue"><Setter Property="Background" Value="{StaticResource CourseBlue}" /></DataTrigger>
+                                  <DataTrigger Binding="{Binding Color}" Value="rose"><Setter Property="Background" Value="{StaticResource CourseRose}" /></DataTrigger>
+                                  <DataTrigger Binding="{Binding Color}" Value="amber"><Setter Property="Background" Value="{StaticResource CourseAmber}" /></DataTrigger>
+                                  <DataTrigger Binding="{Binding Color}" Value="violet"><Setter Property="Background" Value="{StaticResource CourseViolet}" /></DataTrigger>
+                                  <DataTrigger Binding="{Binding Exam}" Value="True"><Setter Property="Background" Value="{StaticResource ExamFill}" /><Setter Property="BorderBrush" Value="{StaticResource ExamEdge}" /></DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </Button.Style>
+                            <StackPanel HorizontalAlignment="Stretch">
+                              <TextBlock Text="{Binding TimeLabel}" FontSize="11" Foreground="{StaticResource Muted}" />
+                              <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                              <TextBlock Text="{Binding Metadata}" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" />
+                            </StackPanel>
+                          </Button>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </Grid>
+      <Grid x:Name="BrowserPanel" Visibility="Collapsed">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+        <DockPanel Margin="0,0,0,12">
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button Click="Browser_Back" Margin="0,0,8,0">返回上一页</Button>
+            <Button Click="Browser_Reload">重新加载</Button>
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="课程平台" Style="{StaticResource PageTitle}" />
+            <TextBlock x:Name="BrowserHost" Foreground="{StaticResource Muted}" />
+          </StackPanel>
+        </DockPanel>
+        <Border Grid.Row="1" x:Name="LoginBanner" Visibility="Collapsed" Style="{StaticResource MetricCard}" Margin="0,0,0,10" Padding="12,8" Background="{StaticResource GlassSelected}">
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Padding="9,5" Click="ConfirmBrowserLogin_Click">检查登录</Button>
+            <TextBlock Text="请在下方完成学校认证。登录后会自动打开原页面。" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,6,0" />
+          </DockPanel>
+        </Border>
+        <StackPanel Grid.Row="2" Margin="0,0,0,7">
+          <ProgressBar x:Name="BrowserProgress" Height="3" IsIndeterminate="True" Visibility="Collapsed" Foreground="{StaticResource Accent}" />
+          <TextBlock x:Name="BrowserFeedback" Foreground="{StaticResource Muted}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+        </StackPanel>
+        <Border Grid.Row="3" Style="{StaticResource FrostedPanel}" Padding="8">
+          <web:WebView2 x:Name="CourseView" />
+        </Border>
+      </Grid>
+      <Border Grid.Row="1" Margin="0,9,0,0" Padding="11,6">
+        <Border.Style>
+          <Style TargetType="Border" BasedOn="{StaticResource FrostedPanel}">
+            <Setter Property="CornerRadius" Value="12" />
+            <Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=Status}" Value=""><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
+          </Style>
+        </Border.Style>
+        <TextBlock x:Name="Status" TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="12" AutomationProperties.LiveSetting="Polite" />
+      </Border>
+    </Grid>
+  </Grid>
+</Window>
