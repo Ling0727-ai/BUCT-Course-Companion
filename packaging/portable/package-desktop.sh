@@ -30,7 +30,7 @@ Section: education
 Priority: optional
 Architecture: $arch
 Maintainer: LingXin <173931019+Ling0727-ai@users.noreply.github.com>
-Depends: libc6, libgl1, libx11-6, libxcursor1, libxi6, libxinerama1, libxrandr2, libxxf86vm1
+Depends: libc6, libgl1, libegl1, libx11-6, libxcursor1, libxi6, libxinerama1, libxrandr2, libxxf86vm1, libwayland-client0, libwayland-cursor0, libwayland-egl1, libxkbcommon0
 Description: BUCT Course Companion
  Desktop companion for assignments, reminders and timetables at BUCT.
 EOF

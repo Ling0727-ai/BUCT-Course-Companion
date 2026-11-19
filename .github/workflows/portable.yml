@@ -55,7 +55,7 @@ jobs:
       - name: Install Linux build prerequisites
         if: runner.os == 'Linux'
         run: |
-          required=(gcc libgl-dev libgl1-mesa-dri libx11-dev libxcursor-dev libxrandr-dev
+          required=(gcc libgl-dev libegl-dev libgl1-mesa-dri libx11-dev libxcursor-dev libxrandr-dev
             libxinerama-dev libxi-dev libxxf86vm-dev libxkbcommon-dev libwayland-dev xvfb xauth)
           missing=()
           for pkg in "${required[@]}"; do
