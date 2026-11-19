@@ -9,6 +9,12 @@ package main
 static int enabled(uintptr_t env, uintptr_t context) {
 	JNIEnv *e = (JNIEnv*)env;
 	jobject activity = (jobject)context;
+	jclass version = (*e)->FindClass(e, "android/os/Build$VERSION");
+	if (version) {
+		jfieldID sdk = (*e)->GetStaticFieldID(e, version, "SDK_INT", "I");
+		if (sdk && (*e)->GetStaticIntField(e, version, sdk) < 24) return 1;
+	}
+	if ((*e)->ExceptionCheck(e)) (*e)->ExceptionClear(e);
 	jclass activityType = (*e)->GetObjectClass(e, activity);
 	jmethodID service = (*e)->GetMethodID(e, activityType, "getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
 	if (!service) { (*e)->ExceptionClear(e); return 0; }

@@ -6,4 +6,5 @@
 *.db-wal
 /course-worker/cmd/buct-portable/*.apk
 /course-worker/cmd/buct-portable/*.apk.idsig
+/course-worker/cmd/buct-portable/*.aab
 /course-worker/cmd/buct-portable/AndroidManifest.xml

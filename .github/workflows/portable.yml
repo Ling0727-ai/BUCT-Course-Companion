@@ -9,10 +9,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: portable-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref_type != 'tag' }}
-
 jobs:
   metadata:
     runs-on: ubuntu-latest
@@ -133,6 +129,18 @@ jobs:
           echo "ANDROID_NDK_HOME=$sdk/ndk/28.2.13676358" >> "$GITHUB_ENV"
           go install fyne.io/tools/cmd/fyne@v1.7.4
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          tools="$RUNNER_TEMP/bundletool"
+          mkdir -p "$tools"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar \
+            --output "$tools/bundletool.jar"
+          echo "a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  $tools/bundletool.jar" | sha256sum --check
+          cat > "$tools/bundletool" <<'EOF'
+          #!/usr/bin/env bash
+          exec java -jar "$(dirname -- "$0")/bundletool.jar" "$@"
+          EOF
+          chmod +x "$tools/bundletool"
+          echo "$tools" >> "$GITHUB_PATH"
       - uses: actions/cache@v5
         with:
           path: ~/.cache/buct-preview

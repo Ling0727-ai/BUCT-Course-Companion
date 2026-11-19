@@ -82,7 +82,7 @@ go test ./...
 Pop-Location
 ```
 
-便携客户端的源码运行需要 C 编译器和 Fyne 的平台依赖。安装包脚本分别使用目标系统的 `dpkg-deb`、`pkgbuild`，或 Android SDK、NDK 和 Fyne CLI。平台依赖见 [Fyne 环境说明](https://docs.fyne.io/started/quick/)。
+便携客户端的源码运行需要 C 编译器和 Fyne 的平台依赖。安装包脚本分别使用目标系统的 `dpkg-deb`、`pkgbuild`，或 Android SDK、NDK、Fyne CLI 和 `bundletool`。平台依赖见 [Fyne 环境说明](https://docs.fyne.io/started/quick/)。
 
 ```text
 bash packaging/portable/package-desktop.sh linux 0.1.0
