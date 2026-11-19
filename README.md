@@ -4,7 +4,7 @@
 
 ## 开始使用
 
-需要 **Windows 10/11 x64** 和 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。从发布目录运行 `BuctCourseLocal.exe`，移动应用时复制整个目录。
+需要 **Windows 10 1809 或 Windows 11（x64）**。下载 `BUCT-Course-Companion-*-Setup-x64.exe`，双击安装后从开始菜单打开「北化课伴」。安装程序会在需要时补装 WebView2 和 Visual C++ 运行库。如果缺少 WebView2，安装时需要联网。升级前先从托盘退出应用。[GitHub Releases](https://github.com/Ling0727-ai/BUCT-Course-Companion/releases) · [Windows 安装包构建记录](https://github.com/Ling0727-ai/BUCT-Course-Companion/actions/workflows/windows.yml)
 
 1. 打开 **账户与通知**。可以选择 **在内置页面登录**，也可以保存学号和密码，供会话过期时自动登录。遇到验证码或二次验证时，在学校登录页完成认证。
 2. 在 **课程与待办** 点击 **同步课程**。同步成功后，应用每 3 小时自动刷新，也可以随时手动刷新。
@@ -52,6 +52,14 @@ dotnet run --project .\desktop\BuctCourseLocal.csproj
 dotnet publish .\desktop\BuctCourseLocal.csproj -c Release --self-contained true -o .\dist\BUCT-Course-Companion
 ```
 
+生成 `.exe` 安装包。需要 PowerShell 7 和 Inno Setup 6，产物位于 `dist\windows-installer`。
+
+```powershell
+pwsh -File .\packaging\windows\Build-Installer.ps1 -Version 0.1.0
+```
+
+推送到 `main` 后，GitHub Actions 会运行 Go 测试、打包并验证安装和卸载。每次运行的 **Artifacts → windows-x64-installer** 提供安装包。推送形如 `v0.1.0` 的版本标签会将同一个 `.exe` 发布到对应的 GitHub Release。
+
 运行 Go 组件测试。
 
 ```powershell
@@ -64,6 +72,7 @@ Pop-Location
 | --- | --- |
 | [`desktop/`](desktop/) | WPF 界面、WebView2、SQLite、文件导入导出和 Windows 托盘 |
 | [`course-worker/`](course-worker/) | 学校会话、作业与测验同步、课表校验和提醒计算 |
+| [`packaging/windows/`](packaging/windows/) | Windows 安装包构建和 Inno Setup 配置 |
 
 ## 来源与许可
 
