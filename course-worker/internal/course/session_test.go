@@ -164,6 +164,29 @@ func TestKeepaliveRespectsCookieExpiryAndRotation(t *testing.T) {
 	}
 }
 
+func TestKeepaliveGetsRotatedCookieWithoutScrapingTasks(t *testing.T) {
+	original := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = original })
+	requests := 0
+	http.DefaultTransport = testRoundTripper(func(req *http.Request) (*http.Response, error) {
+		requests++
+		if req.URL.Path != reminderPath || req.Method != http.MethodGet {
+			t.Fatalf("unexpected keepalive request: %s %s", req.Method, req.URL)
+		}
+		if c, err := req.Cookie("JSESSIONID"); err != nil || c.Value != "webview-session" {
+			t.Fatal("keepalive did not reuse the saved session")
+		}
+		response := responsePage(req, "<html>signed in</html>")
+		response.Header.Add("Set-Cookie", "JSESSIONID=renewed; Path=/meol; Secure; HttpOnly")
+		return response, nil
+	})
+	result := Run(Request{Mode: "session", Cookies: []Cookie{courseCookie()}})
+	if requests != 1 || result.Tasks != nil || result.NeedsLogin || result.Error != "" || result.SessionCheckAt == 0 ||
+		len(result.Cookies) != 1 || result.Cookies[0].Value != "renewed" {
+		t.Fatalf("unexpected keepalive result: %+v", result)
+	}
+}
+
 func responsePage(req *http.Request, body string) *http.Response {
 	return &http.Response{
 		StatusCode: http.StatusOK, Request: req,

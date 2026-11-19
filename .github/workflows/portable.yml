@@ -112,11 +112,16 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+          log-accepted-android-sdk-licenses: false
       - name: Install Android SDK and NDK
         run: |
-          { yes || true; } | sdkmanager --licenses >/dev/null
           sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358'
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
+          sdk=${ANDROID_HOME:-${ANDROID_SDK_ROOT:?Android SDK is required}}
+          echo "ANDROID_HOME=$sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$sdk/ndk/28.2.13676358" >> "$GITHUB_ENV"
           go install fyne.io/tools/cmd/fyne@v1.7.4
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - uses: actions/cache@v5

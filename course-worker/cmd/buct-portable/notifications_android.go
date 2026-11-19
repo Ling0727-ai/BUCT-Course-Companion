@@ -30,12 +30,14 @@ static int open_settings(uintptr_t env, uintptr_t context) {
 	if (!intentType) { (*e)->ExceptionClear(e); return 0; }
 	jmethodID init = (*e)->GetMethodID(e, intentType, "<init>", "(Ljava/lang/String;)V");
 	jmethodID extra = (*e)->GetMethodID(e, intentType, "putExtra", "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;");
+	jmethodID flags = (*e)->GetMethodID(e, intentType, "addFlags", "(I)Landroid/content/Intent;");
 	jmethodID pkg = (*e)->GetMethodID(e, activityType, "getPackageName", "()Ljava/lang/String;");
 	jmethodID start = (*e)->GetMethodID(e, activityType, "startActivity", "(Landroid/content/Intent;)V");
-	if (!init || !extra || !pkg || !start) { (*e)->ExceptionClear(e); return 0; }
+	if (!init || !extra || !flags || !pkg || !start) { (*e)->ExceptionClear(e); return 0; }
 	jobject intent = (*e)->NewObject(e, intentType, init, (*e)->NewStringUTF(e, "android.settings.APP_NOTIFICATION_SETTINGS"));
 	jobject name = (*e)->CallObjectMethod(e, activity, pkg);
 	(*e)->CallObjectMethod(e, intent, extra, (*e)->NewStringUTF(e, "android.provider.extra.APP_PACKAGE"), name);
+	(*e)->CallObjectMethod(e, intent, flags, (jint)0x10000000);
 	if ((*e)->ExceptionCheck(e)) { (*e)->ExceptionClear(e); return 0; }
 	(*e)->CallVoidMethod(e, activity, start, intent);
 	if ((*e)->ExceptionCheck(e)) { (*e)->ExceptionClear(e); return 0; }

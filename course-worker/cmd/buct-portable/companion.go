@@ -90,6 +90,7 @@ func (c *companion) setStatus(value string) {
 }
 
 func (c *companion) start() {
+	c.app.Lifecycle().SetOnEnteredForeground(func() { fyne.Do(c.tick) })
 	go func() {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
@@ -98,25 +99,28 @@ func (c *companion) start() {
 			case <-c.stopped:
 				return
 			case <-ticker.C:
-				fyne.Do(func() {
-					select {
-					case <-c.stopped:
-						return
-					default:
-					}
-					c.checkNotices()
-					if c.account.StudentID != "" && !c.busy {
-						now := time.Now()
-						if !now.Before(c.nextSync) {
-							c.syncTasks()
-						} else if !now.Before(c.nextSessionCheck) {
-							c.keepSession()
-						}
-					}
-				})
+				fyne.Do(c.tick)
 			}
 		}
 	}()
+}
+
+func (c *companion) tick() {
+	select {
+	case <-c.stopped:
+		return
+	default:
+	}
+	c.checkNotices()
+	if c.account.StudentID == "" || c.busy {
+		return
+	}
+	now := time.Now()
+	if !now.Before(c.nextSync) {
+		c.syncTasks()
+	} else if !now.Before(c.nextSessionCheck) {
+		c.keepSession()
+	}
 }
 
 func (c *companion) stop() { c.stopOnce.Do(func() { close(c.stopped) }) }
