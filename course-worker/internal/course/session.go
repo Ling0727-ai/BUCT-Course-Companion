@@ -59,6 +59,7 @@ type Result struct {
 	Courses         []CatalogCourse `json:"courses,omitempty"`
 	Entries         []CatalogEntry  `json:"entries,omitempty"`
 	Detail          *ItemDetail     `json:"detail,omitempty"`
+	SessionCheckAt  int64           `json:"sessionCheckAt,omitempty"`
 }
 
 // Cookie domains are limited to the course site and its parent domain.
@@ -327,5 +328,30 @@ func Run(request Request) Result {
 	for _, cookie := range transport.updates {
 		result.Cookies = append(result.Cookies, cookie)
 	}
+	previous := request.Cookies
+	if newSession {
+		previous = nil
+	}
+	result.SessionCheckAt = sessionCheckAt(time.Now().Unix(), previous, result.Cookies)
 	return result
+}
+
+func sessionCheckAt(now int64, previous, updates []Cookie) int64 {
+	// Keep this independent from the task refresh interval. Session cookies may
+	// have no client-visible expiry; a protected request still picks up rotation.
+	next := now + 25*60
+	expires := make(map[[3]string]int64)
+	for _, group := range [][]Cookie{previous, updates} {
+		for _, cookie := range group {
+			if strings.EqualFold(cookie.Name, "JSESSIONID") && courseDomain(cookie.Domain) {
+				expires[[3]string{cookie.Name, cookie.Domain, cookie.Path}] = cookie.Expires
+			}
+		}
+	}
+	for _, at := range expires {
+		if at > now {
+			next = min(next, max(now+30, at-120))
+		}
+	}
+	return next
 }

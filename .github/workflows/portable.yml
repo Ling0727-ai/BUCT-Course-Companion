@@ -1,0 +1,162 @@
+name: Linux macOS Android packages
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portable-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build: ${{ steps.version.outputs.build }}
+    steps:
+      - id: version
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Use a version tag such as v0.1.0'; exit 2; }
+            version=${GITHUB_REF_NAME#v}
+          else
+            version="0.1.$GITHUB_RUN_NUMBER"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build=$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+
+  desktop:
+    needs: metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux
+            artifact: linux-amd64
+          - os: macos-15
+            platform: macos
+            artifact: macos-arm64
+          - os: macos-15-intel
+            platform: macos
+            artifact: macos-x86_64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: course-worker/go.mod
+          cache-dependency-path: course-worker/go.sum
+      - name: Install Linux build prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc libgl1-mesa-dev libgl1-mesa-dri libx11-dev libxcursor-dev \
+            libxrandr-dev libxinerama-dev libxi-dev libxxf86vm-dev libxkbcommon-dev libwayland-dev xvfb xauth
+      - name: Test Go modules
+        working-directory: course-worker
+        run: go test ./...
+      - name: Build installer
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+          PLATFORM: ${{ matrix.platform }}
+        run: bash packaging/portable/package-desktop.sh "$PLATFORM" "$VERSION"
+      - name: Verify Linux package and launch the native window
+        if: runner.os == 'Linux'
+        run: |
+          scratch=$(mktemp -d)
+          installer=$(find dist/portable -name '*.deb' -print -quit)
+          dpkg-deb --info "$installer"
+          dpkg-deb --extract "$installer" "$scratch"
+          XDG_CONFIG_HOME="$scratch/config" LIBGL_ALWAYS_SOFTWARE=1 BUCT_PORTABLE_SMOKE=1 \
+            timeout 30s xvfb-run -a "$scratch/usr/bin/buct-course-companion" | grep -F 'BUCT portable app opened'
+      - name: Verify macOS package contents
+        if: runner.os == 'macOS'
+        run: |
+          scratch=$(mktemp -d)
+          installer=$(find dist/portable -name '*.pkg' -print -quit)
+          pkgutil --expand-full "$installer" "$scratch/expanded"
+          app=$(find "$scratch/expanded" -name 'BUCT Course Companion.app' -print -quit)
+          test -n "$app"
+          codesign --verify "$app"
+          file "$app/Contents/MacOS/buct-course-companion" | grep -F "$(uname -m)"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/portable/*
+          if-no-files-found: error
+          compression-level: 0
+
+  android:
+    needs: metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: course-worker/go.mod
+          cache-dependency-path: course-worker/go.sum
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Android SDK and NDK
+        run: |
+          { yes || true; } | sdkmanager --licenses >/dev/null
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358'
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
+          go install fyne.io/tools/cmd/fyne@v1.7.4
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - uses: actions/cache@v5
+        with:
+          path: ~/.cache/buct-preview
+          key: android-preview-key-buct-course-companion-v1
+      - name: Build and verify APK
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+          BUILD: ${{ needs.metadata.outputs.build }}
+          BUCT_ANDROID_KEYSTORE_B64: ${{ secrets.BUCT_ANDROID_KEYSTORE_B64 }}
+          BUCT_ANDROID_STORE_PASSWORD: ${{ secrets.BUCT_ANDROID_STORE_PASSWORD }}
+          BUCT_ANDROID_KEY_PASSWORD: ${{ secrets.BUCT_ANDROID_KEY_PASSWORD }}
+          BUCT_ANDROID_KEY_ALIAS: ${{ secrets.BUCT_ANDROID_KEY_ALIAS }}
+        run: bash packaging/portable/package-android.sh "$VERSION" "$BUILD"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-arm64
+          path: dist/portable/*.apk
+          if-no-files-found: error
+          compression-level: 0
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [desktop, android]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Publish installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=(release-assets/*.deb release-assets/*.pkg release-assets/*.apk)
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            if gh release create "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes; then exit 0; fi
+          fi
+          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber

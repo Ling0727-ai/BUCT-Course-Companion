@@ -28,7 +28,8 @@ type EventView struct {
 	Exam     bool   `json:"exam"`
 }
 
-func buildWeek(state State, monday, now time.Time) *WeekView {
+// ViewWeek returns the seven days of a week and the next upcoming event.
+func ViewWeek(state State, monday, now time.Time) *WeekView {
 	view := &WeekView{}
 	for offset := 0; offset < 7; offset++ {
 		date := monday.AddDate(0, 0, offset)

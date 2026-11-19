@@ -56,13 +56,13 @@ func Run(request Request, now time.Time) Reply {
 	if state.Courses == nil {
 		state.Courses = []Course{}
 	}
-	reply := Reply{State: &state, Reminders: reminders(state, now)}
+	reply := Reply{State: &state, Reminders: UpcomingNotices(state, now)}
 	if request.Week != "" {
 		monday, err := time.ParseInLocation("2006-01-02", request.Week, now.Location())
 		if err != nil || monday.Weekday() != time.Monday {
 			return Reply{Error: "课表周起始日期无效。"}
 		}
-		reply.Week = buildWeek(state, monday, now)
+		reply.Week = ViewWeek(state, monday, now)
 	}
 	if request.Export {
 		first, _ := time.ParseInLocation("2006-01-02", state.Settings.TermStart, now.Location())
@@ -83,7 +83,7 @@ func Run(request Request, now time.Time) Reply {
 
 // The native host refreshes the queue daily. CourseFlow's OccursOn also
 // accounts for term weeks, holidays, make-up days and single cancellations.
-func reminders(state State, now time.Time) []Notice {
+func UpcomingNotices(state State, now time.Time) []Notice {
 	if !state.Settings.Reminder {
 		return nil
 	}

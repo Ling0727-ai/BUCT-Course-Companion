@@ -26,7 +26,7 @@ jobs:
           cache-dependency-path: course-worker/go.sum
       - name: Run Go tests
         working-directory: course-worker
-        run: go test ./...
+        run: go test ./cmd/course-worker ./internal/course ./internal/courseflow ./internal/remindscraper
       - name: Set package version
         shell: pwsh
         run: |
@@ -80,8 +80,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" release-assets/*-Setup-x64.exe --repo "$GITHUB_REPOSITORY" --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" release-assets/*-Setup-x64.exe --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            if gh release create "$GITHUB_REF_NAME" release-assets/*-Setup-x64.exe --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes; then exit 0; fi
           fi
+          gh release upload "$GITHUB_REF_NAME" release-assets/*-Setup-x64.exe --repo "$GITHUB_REPOSITORY" --clobber

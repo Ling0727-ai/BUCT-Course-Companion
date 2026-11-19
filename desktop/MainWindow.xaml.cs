@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private Uri? afterLogin;
     private CourseTask? noticeTarget;
     private long nextSync;
+    private long nextSessionCheck;
     private long nextUrgencyChange = long.MaxValue;
     private TaskUrgency? urgencyFilter;
     private string? kindFilter;
@@ -96,8 +97,13 @@ public partial class MainWindow : Window
                 FilterTasks();
             var taskNotified = NoticesOn && NotifyDue();
             TickCourseFlow(canShow: !taskNotified);
-            if (!busy && openDialogs == 0 && afterLogin is null && (account is not null || savedCookies.Count > 0) && Now >= nextSync)
-                _ = RefreshAsync(false);
+            if (!busy && openDialogs == 0 && afterLogin is null && (account is not null || savedCookies.Count > 0))
+            {
+                if (Now >= nextSync)
+                    _ = RefreshAsync(false);
+                else if (Now >= nextSessionCheck)
+                    _ = KeepSessionAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -259,6 +265,7 @@ public partial class MainWindow : Window
         if (result.NeedsLogin)
         {
             nextSync = Now + 3 * 3600;
+            nextSessionCheck = Now + 25 * 60;
             Status.Text = result.Error ?? "课程会话已失效，请在课程平台登录。";
             if (interactive)
                 BeginBrowserLogin(new Uri(CourseService.HomeUrl), true);
@@ -506,8 +513,25 @@ public partial class MainWindow : Window
         string courseId = "", string itemId = "") =>
         CourseService.RunAsync(mode, credentials, cookies, web!.Settings.UserAgent, quit.Token, courseId, itemId);
 
+    private Task KeepSessionAsync() => RunAsync("", async () =>
+    {
+        nextSessionCheck = Now + 2 * 60;
+        await EnsureBrowserAsync();
+        var result = await RunCourseAsync("session", account, await ReadCookiesAsync());
+        if (result.NeedsLogin)
+        {
+            nextSessionCheck = Now + 25 * 60;
+            Status.Text = result.Error ?? "课程会话已过期，请打开课程平台完成认证。";
+            return;
+        }
+        if (result.Error is null)
+            await ApplyCourseSessionAsync(result);
+    });
+
     private async Task ApplyCourseSessionAsync(CourseResult result)
     {
+        if (result.SessionCheckAt > 0)
+            nextSessionCheck = result.SessionCheckAt;
         if (result.NewSession)
         {
             var manager = web!.CookieManager;

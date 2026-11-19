@@ -10,7 +10,7 @@ internal record CourseRequest(string Mode, string? StudentId, string? Password, 
     string CourseId, string ItemId);
 internal record CourseResult(List<CourseTask>? Tasks, List<CourseCookie>? Cookies, bool NeedsLogin, string? Error,
     bool NewSession = false, List<string>? IncompleteKinds = null, string? Warning = null,
-    List<CatalogCourse>? Courses = null, List<CatalogEntry>? Entries = null, ItemDetail? Detail = null);
+    List<CatalogCourse>? Courses = null, List<CatalogEntry>? Entries = null, ItemDetail? Detail = null, long SessionCheckAt = 0);
 
 internal static class CourseService
 {

@@ -147,6 +147,23 @@ func statusPage(req *http.Request, code int) *http.Response {
 	return response
 }
 
+func TestKeepaliveRespectsCookieExpiryAndRotation(t *testing.T) {
+	const now = 100_000
+	old := courseCookie()
+	if got := sessionCheckAt(now, []Cookie{old}, nil); got != now+25*60 {
+		t.Fatalf("session-cookie interval: %d", got)
+	}
+	old.Expires = now + 8*60
+	if got := sessionCheckAt(now, []Cookie{old}, nil); got != now+6*60 {
+		t.Fatalf("should run before cookie expiry: %d", got)
+	}
+	rotated := old
+	rotated.Expires = now + 3600
+	if got := sessionCheckAt(now, []Cookie{old}, []Cookie{rotated}); got != now+25*60 {
+		t.Fatalf("old cookie expiry was not replaced: %d", got)
+	}
+}
+
 func responsePage(req *http.Request, body string) *http.Response {
 	return &http.Response{
 		StatusCode: http.StatusOK, Request: req,
