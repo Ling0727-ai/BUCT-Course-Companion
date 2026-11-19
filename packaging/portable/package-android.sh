@@ -36,7 +36,7 @@ binary="BUCT-Course-Companion.apk"
 sed -e "s/@APP_ID@/$app_id/g" -e "s/@BUILD@/$build/g" -e "s/@VERSION@/$version/g" \
     "$root/packaging/portable/AndroidManifest.xml.in" > AndroidManifest.xml
 fyne package --target android/arm64 --app-id "$app_id" --name BUCT-Course-Companion --icon assets/Icon.png \
-    --app-version "$version" --app-build "$build" --ldflags=-w
+    --app-version "$version" --app-build "$build"
 
 sdk=${ANDROID_HOME:-${ANDROID_SDK_ROOT:?Android SDK is required}}
 tools="$sdk/build-tools/36.0.0"
