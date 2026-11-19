@@ -32,17 +32,24 @@ else
     unset BUCT_ANDROID_KEYSTORE_B64
 fi
 
-binary="BUCT-Course-Companion.aab"
+binary="BUCTCourseCompanion.aab"
 sed -e "s/@APP_ID@/$app_id/g" -e "s/@BUILD@/$build/g" -e "s/@VERSION@/$version/g" \
     "$root/packaging/portable/AndroidManifest.xml.in" > AndroidManifest.xml
-fyne package --target android/arm64 --app-id "$app_id" --name BUCT-Course-Companion --icon assets/Icon.png \
-    --app-version "$version" --app-build "$build" --release
+printf '%s\n' "$BUCT_ANDROID_STORE_PASSWORD" > "$stage/store-password"
+printf '%s\n' "$BUCT_ANDROID_KEY_PASSWORD" > "$stage/key-password"
+unset BUCT_ANDROID_STORE_PASSWORD BUCT_ANDROID_KEY_PASSWORD
+
+# Fyne's distribution command creates the AAB. The intermediate key is not
+# used to sign the downloadable APK; bundletool applies the selected key below.
+keytool -genkeypair -keystore "$stage/intermediate.keystore" -storepass android -keypass android -alias intermediate \
+    -dname 'CN=BUCT AAB Builder' -keyalg RSA -keysize 2048 -validity 7 >/dev/null
+fyne release --target android/arm64 --app-id "$app_id" --name BUCTCourseCompanion --icon assets/Icon.png \
+    --app-version "$version" --app-build "$build" --keystore "$stage/intermediate.keystore" \
+    --keystore-pass android --key-name intermediate --key-pass android
 
 sdk=${ANDROID_HOME:-${ANDROID_SDK_ROOT:?Android SDK is required}}
 tools="$sdk/build-tools/36.0.0"
 installer="$output/BUCT-Course-Companion-$version-$label.apk"
-printf '%s\n' "$BUCT_ANDROID_STORE_PASSWORD" > "$stage/store-password"
-printf '%s\n' "$BUCT_ANDROID_KEY_PASSWORD" > "$stage/key-password"
 bundletool build-apks --mode=universal --bundle="$binary" --output="$stage/application.apks" \
     --ks="$keystore" --ks-key-alias="$BUCT_ANDROID_KEY_ALIAS" \
     --ks-pass="file:$stage/store-password" --key-pass="file:$stage/key-password"
