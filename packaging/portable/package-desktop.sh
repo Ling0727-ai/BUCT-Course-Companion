@@ -17,6 +17,8 @@ go build -trimpath -ldflags='-s -w' -o "$stage/buct-course-companion" ./cmd/buct
 case "$platform" in
   linux)
     arch=$(dpkg --print-architecture)
+    glibc=$(objdump -T "$stage/buct-course-companion" | sed -nE 's/.*\(GLIBC_([0-9.]+)\).*/\1/p' | sort -V | tail -n 1)
+    : "${glibc:?Unable to determine minimum glibc version}"
     package="$stage/deb"
     mkdir -p "$package"/{DEBIAN,usr/bin,usr/share/applications,usr/share/icons/hicolor/512x512/apps,usr/share/doc/buct-course-companion}
     install -m 0755 "$stage/buct-course-companion" "$package/usr/bin/buct-course-companion"
@@ -30,7 +32,7 @@ Section: education
 Priority: optional
 Architecture: $arch
 Maintainer: LingXin <173931019+Ling0727-ai@users.noreply.github.com>
-Depends: libc6, libgl1, libegl1, libx11-6, libxcursor1, libxi6, libxinerama1, libxrandr2, libxxf86vm1, libwayland-client0, libwayland-cursor0, libwayland-egl1, libxkbcommon0
+Depends: libc6 (>= $glibc), libgl1, libegl1, libx11-6, libxcursor1, libxi6, libxinerama1, libxrandr2, libxxf86vm1, libwayland-client0, libwayland-cursor0, libwayland-egl1, libxkbcommon0
 Description: BUCT Course Companion
  Desktop companion for assignments, reminders and timetables at BUCT.
 EOF
@@ -48,6 +50,7 @@ EOF
     ;;
   macos)
     arch=$(uname -m)
+    identifier=io.github.ling0727ai.buctcoursecompanion
     bundle="$stage/BUCT Course Companion.app"
     mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources" "$stage/Application.iconset"
     install -m 0755 "$stage/buct-course-companion" "$bundle/Contents/MacOS/buct-course-companion"
@@ -61,7 +64,7 @@ EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleIdentifier</key><string>io.github.ling0727ai.buctcoursecompanion</string>
+<key>CFBundleIdentifier</key><string>$identifier</string>
 <key>CFBundleName</key><string>BUCT Course Companion</string>
 <key>CFBundleDisplayName</key><string>北化课伴</string>
 <key>CFBundlePackageType</key><string>APPL</string>
@@ -75,7 +78,8 @@ EOF
 EOF
     plutil -lint "$bundle/Contents/Info.plist"
     codesign --force --sign - "$bundle"
-    pkgbuild --component "$bundle" --install-location /Applications "$output/BUCT-Course-Companion-$version-macos-$arch.pkg"
+    pkgbuild --component "$bundle" --identifier "$identifier" --version "$version" \
+      --install-location /Applications "$output/BUCT-Course-Companion-$version-macos-$arch.pkg"
     ;;
   *)
     echo "Unsupported platform: $platform" >&2

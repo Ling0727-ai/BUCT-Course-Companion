@@ -1,0 +1,109 @@
+name: Build and release installers
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: distribution-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build: ${{ steps.version.outputs.build }}
+    steps:
+      - name: Set version for all installers
+        id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            segment='(0|[1-9][0-9]{0,3})'
+            [[ "$GITHUB_REF_NAME" =~ ^v$segment\.$segment\.$segment$ ]] || {
+              echo 'Use a version tag such as v0.1.0 (three numeric parts, each at most four digits).' >&2
+              exit 2
+            }
+            version=${GITHUB_REF_NAME#v}
+          else
+            version="0.$((GITHUB_RUN_NUMBER / 1000)).$((GITHUB_RUN_NUMBER % 1000))"
+          fi
+          # Keep Android versionCode increasing from the previous workflows.
+          echo "build=$((1000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  windows:
+    needs: metadata
+    uses: ./.github/workflows/windows.yml
+    with:
+      version: ${{ needs.metadata.outputs.version }}
+
+  portable:
+    needs: metadata
+    uses: ./.github/workflows/portable.yml
+    with:
+      version: ${{ needs.metadata.outputs.version }}
+      build: ${{ needs.metadata.outputs.build }}
+    secrets:
+      BUCT_ANDROID_KEYSTORE_B64: ${{ secrets.BUCT_ANDROID_KEYSTORE_B64 }}
+      BUCT_ANDROID_STORE_PASSWORD: ${{ secrets.BUCT_ANDROID_STORE_PASSWORD }}
+      BUCT_ANDROID_KEY_PASSWORD: ${{ secrets.BUCT_ANDROID_KEY_PASSWORD }}
+      BUCT_ANDROID_KEY_ALIAS: ${{ secrets.BUCT_ANDROID_KEY_ALIAS }}
+
+  verify:
+    name: Check all installers and generate checksums
+    needs: [metadata, windows, portable]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: installer-*
+          path: release-assets
+          merge-multiple: true
+      - name: Check installer set
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: bash packaging/release/prepare-assets.sh "$VERSION" release-assets
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-checksums
+          path: release-assets/SHA256SUMS.txt
+          if-no-files-found: error
+          overwrite: true
+
+  release:
+    name: Publish all installers together
+    if: github.ref_type == 'tag'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: installer-*
+          path: release-assets
+          merge-multiple: true
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-checksums
+          path: release-assets
+      - name: Stage, verify and publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash packaging/release/publish.sh "$GITHUB_REF_NAME" release-assets

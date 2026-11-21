@@ -1,10 +1,11 @@
 name: Windows installer
 
 on:
-  push:
-    branches: [main]
-    tags: ['v*']
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -27,23 +28,17 @@ jobs:
       - name: Run Go tests
         working-directory: course-worker
         run: go test ./cmd/course-worker ./internal/course ./internal/courseflow ./internal/remindscraper
-      - name: Set package version
-        shell: pwsh
-        run: |
-          if ($env:GITHUB_REF_TYPE -eq 'tag') {
-            if ($env:GITHUB_REF_NAME -notmatch '^v\d+\.\d+\.\d+(?:\.\d+)?$') { throw 'Use a version tag such as v0.1.0.' }
-            $version = $env:GITHUB_REF_NAME.Substring(1)
-          } else {
-            $version = "0.1.$env:GITHUB_RUN_NUMBER"
-          }
-          "INSTALLER_VERSION=$version" >> $env:GITHUB_ENV
       - name: Build installer
+        env:
+          VERSION: ${{ inputs.version }}
         shell: pwsh
-        run: ./packaging/windows/Build-Installer.ps1 -Version $env:INSTALLER_VERSION
+        run: ./packaging/windows/Build-Installer.ps1 -Version $env:VERSION
       - name: Verify installer and uninstaller
+        env:
+          VERSION: ${{ inputs.version }}
         shell: pwsh
         run: |
-          $exe = (Get-Item -LiteralPath "dist/windows-installer/BUCT-Course-Companion-$env:INSTALLER_VERSION-Setup-x64.exe").FullName
+          $exe = (Get-Item -LiteralPath "dist/windows-installer/BUCT-Course-Companion-$env:VERSION-Setup-x64.exe").FullName
           $target = Join-Path $env:RUNNER_TEMP 'buct-installer-smoke'
           $log = Join-Path $env:RUNNER_TEMP 'buct-installer.log'
           $arguments = '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$target`"", "/LOG=`"$log`""
@@ -57,30 +52,11 @@ jobs:
           }
           $uninstall = Start-Process -FilePath (Join-Path $target 'unins000.exe') -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -WindowStyle Hidden -Wait -PassThru
           if ($uninstall.ExitCode -ne 0) { throw "Uninstall returned $($uninstall.ExitCode)." }
+          if (Test-Path -LiteralPath (Join-Path $target 'BuctCourseLocal.exe')) { throw 'Uninstall left the application installed.' }
       - uses: actions/upload-artifact@v7
         with:
-          name: windows-x64-installer
+          name: installer-windows-x64
           path: dist/windows-installer/*-Setup-x64.exe
           if-no-files-found: error
           compression-level: 0
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: package
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: windows-x64-installer
-          path: release-assets
-      - name: Publish tagged installer
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            if gh release create "$GITHUB_REF_NAME" release-assets/*-Setup-x64.exe --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes; then exit 0; fi
-          fi
-          gh release upload "$GITHUB_REF_NAME" release-assets/*-Setup-x64.exe --repo "$GITHUB_REPOSITORY" --clobber
+          overwrite: true

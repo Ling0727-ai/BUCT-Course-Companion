@@ -16,6 +16,10 @@ trap 'rm -f -- AndroidManifest.xml; rm -rf -- "$stage"' EXIT
 app_id=io.github.ling0727ai.buctcoursecompanion
 label=android-arm64
 if [[ -z ${BUCT_ANDROID_KEYSTORE_B64:-} ]]; then
+    if [[ -n ${BUCT_ANDROID_STORE_PASSWORD:-}${BUCT_ANDROID_KEY_PASSWORD:-}${BUCT_ANDROID_KEY_ALIAS:-} ]]; then
+        echo 'Android signing is incomplete: BUCT_ANDROID_KEYSTORE_B64 is missing.' >&2
+        exit 2
+    fi
     app_id+=.preview
     label+=-preview
     keystore="${BUCT_ANDROID_PREVIEW_KEYSTORE:-${XDG_CACHE_HOME:-$HOME/.cache}/buct-preview/debug.keystore}"
@@ -58,5 +62,24 @@ unzip -p "$stage/application.apks" universal.apk > "$installer"
 "$tools/zipalign" -c -P 16 4 "$installer"
 badging=$("$tools/aapt" dump badging "$installer")
 printf '%s\n' "$badging" | grep -E '^package:|^native-code:|^targetSdkVersion:'
+grep -F "package: name='$app_id' versionCode='$build' versionName='$version'" <<< "$badging"
+grep -Ex "native-code: 'arm64-v8a'[[:space:]]*" <<< "$badging"
 printf '%s\n' "$badging" | grep -F "targetSdkVersion:'36'" >/dev/null
 "$tools/aapt" dump permissions "$installer" | grep -F 'android.permission.POST_NOTIFICATIONS' >/dev/null
+
+# APK entry offsets and ELF LOAD segments both need to support 16 KB pages.
+llvm_readelf=$(find "${ANDROID_NDK_HOME:?Android NDK is required}/toolchains/llvm/prebuilt" \
+    -path '*/bin/llvm-readelf' -print -quit)
+: "${llvm_readelf:?llvm-readelf was not found in the Android NDK}"
+unzip -q "$installer" 'lib/arm64-v8a/*.so' -d "$stage"
+for library in "$stage/lib/arm64-v8a/"*.so; do
+    headers=$("$llvm_readelf" --wide --program-headers "$library")
+    alignments=$(awk '$1 == "LOAD" { print $NF }' <<< "$headers")
+    : "${alignments:?The native library has no LOAD segments}"
+    while read -r alignment; do
+        if (( alignment < 0x4000 )); then
+            echo "Native library does not support 16 KB pages: ${library##*/} ($alignment)" >&2
+            exit 1
+        fi
+    done <<< "$alignments"
+done

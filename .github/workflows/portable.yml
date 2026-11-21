@@ -1,34 +1,29 @@
 name: Linux macOS Android packages
 
 on:
-  push:
-    branches: [main]
-    tags: ['v*']
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      build:
+        required: true
+        type: string
+    secrets:
+      BUCT_ANDROID_KEYSTORE_B64:
+        required: false
+      BUCT_ANDROID_STORE_PASSWORD:
+        required: false
+      BUCT_ANDROID_KEY_PASSWORD:
+        required: false
+      BUCT_ANDROID_KEY_ALIAS:
+        required: false
 
 permissions:
   contents: read
 
 jobs:
-  metadata:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      build: ${{ steps.version.outputs.build }}
-    steps:
-      - id: version
-        run: |
-          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
-            [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Use a version tag such as v0.1.0'; exit 2; }
-            version=${GITHUB_REF_NAME#v}
-          else
-            version="0.1.$GITHUB_RUN_NUMBER"
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "build=$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
-
   desktop:
-    needs: metadata
     strategy:
       fail-fast: false
       matrix:
@@ -72,37 +67,41 @@ jobs:
         run: go test ./...
       - name: Build installer
         env:
-          VERSION: ${{ needs.metadata.outputs.version }}
+          VERSION: ${{ inputs.version }}
           PLATFORM: ${{ matrix.platform }}
         run: bash packaging/portable/package-desktop.sh "$PLATFORM" "$VERSION"
-      - name: Verify Linux package and launch the native window
+      - name: Verify Linux install, launch and removal
         if: runner.os == 'Linux'
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           scratch=$(mktemp -d)
-          installer=$(find dist/portable -name '*.deb' -print -quit)
-          dpkg-deb --info "$installer"
-          dpkg-deb --extract "$installer" "$scratch"
+          installer="$PWD/dist/portable/BUCT-Course-Companion-$VERSION-linux-amd64.deb"
+          sudo apt-get install -y --no-install-recommends "$installer"
+          test "$(dpkg-query -W -f='${Version}' buct-course-companion)" = "$VERSION"
           XDG_CONFIG_HOME="$scratch/config" LIBGL_ALWAYS_SOFTWARE=1 BUCT_PORTABLE_SMOKE=1 \
-            timeout 30s xvfb-run -a "$scratch/usr/bin/buct-course-companion" | grep -F 'BUCT portable app opened'
-      - name: Verify macOS package contents
+            timeout 30s xvfb-run -a /usr/bin/buct-course-companion | grep -F 'BUCT portable app opened'
+          sudo apt-get remove -y buct-course-companion
+          test ! -e /usr/bin/buct-course-companion
+      - name: Verify macOS package and install it
         if: runner.os == 'macOS'
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          scratch=$(mktemp -d)
-          installer=$(find dist/portable -name '*.pkg' -print -quit)
-          pkgutil --expand-full "$installer" "$scratch/expanded"
-          app=$(find "$scratch/expanded" -name 'BUCT Course Companion.app' -print -quit)
-          test -n "$app"
-          codesign --verify "$app"
-          file "$app/Contents/MacOS/buct-course-companion" | grep -F "$(uname -m)"
+          arch=$(uname -m)
+          sudo installer -pkg "dist/portable/BUCT-Course-Companion-$VERSION-macos-$arch.pkg" -target /
+          app='/Applications/BUCT Course Companion.app'
+          codesign --verify --deep --strict "$app"
+          test "$(lipo -archs "$app/Contents/MacOS/buct-course-companion")" = "$arch"
+          pkgutil --pkg-info io.github.ling0727ai.buctcoursecompanion | grep -Fx "version: $VERSION"
       - uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.artifact }}
+          name: installer-${{ matrix.artifact }}
           path: dist/portable/*
           if-no-files-found: error
           compression-level: 0
-
+          overwrite: true
   android:
-    needs: metadata
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -147,38 +146,17 @@ jobs:
           key: android-preview-key-buct-course-companion-v1
       - name: Build and verify APK
         env:
-          VERSION: ${{ needs.metadata.outputs.version }}
-          BUILD: ${{ needs.metadata.outputs.build }}
-          BUCT_ANDROID_KEYSTORE_B64: ${{ secrets.BUCT_ANDROID_KEYSTORE_B64 }}
-          BUCT_ANDROID_STORE_PASSWORD: ${{ secrets.BUCT_ANDROID_STORE_PASSWORD }}
-          BUCT_ANDROID_KEY_PASSWORD: ${{ secrets.BUCT_ANDROID_KEY_PASSWORD }}
-          BUCT_ANDROID_KEY_ALIAS: ${{ secrets.BUCT_ANDROID_KEY_ALIAS }}
+          VERSION: ${{ inputs.version }}
+          BUILD: ${{ inputs.build }}
+          BUCT_ANDROID_KEYSTORE_B64: ${{ github.ref_type == 'tag' && secrets.BUCT_ANDROID_KEYSTORE_B64 || '' }}
+          BUCT_ANDROID_STORE_PASSWORD: ${{ github.ref_type == 'tag' && secrets.BUCT_ANDROID_STORE_PASSWORD || '' }}
+          BUCT_ANDROID_KEY_PASSWORD: ${{ github.ref_type == 'tag' && secrets.BUCT_ANDROID_KEY_PASSWORD || '' }}
+          BUCT_ANDROID_KEY_ALIAS: ${{ github.ref_type == 'tag' && secrets.BUCT_ANDROID_KEY_ALIAS || '' }}
         run: bash packaging/portable/package-android.sh "$VERSION" "$BUILD"
       - uses: actions/upload-artifact@v7
         with:
-          name: android-arm64
+          name: installer-android-arm64
           path: dist/portable/*.apk
           if-no-files-found: error
           compression-level: 0
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [desktop, android]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          path: release-assets
-          merge-multiple: true
-      - name: Publish installers
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          files=(release-assets/*.deb release-assets/*.pkg release-assets/*.apk)
-          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            if gh release create "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes; then exit 0; fi
-          fi
-          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+          overwrite: true

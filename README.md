@@ -1,10 +1,22 @@
 # 北化课伴 · BUCT Course Companion
 
-面向北京化工大学学生的 Windows 桌面应用。在一个窗口里查看北化在线的作业和测验、安排个人待办、管理课表，并接收截止与课前提醒。
+面向北京化工大学学生的本地应用，支持 Windows、Linux、macOS 和 Android。用它查看北化在线的作业和测验、安排个人待办、管理课表，并接收截止与课前提醒。
 
 ## 开始使用
 
-需要 **Windows 10 1809 或 Windows 11（x64）**。下载 `BUCT-Course-Companion-*-Setup-x64.exe`，双击安装后从开始菜单打开「北化课伴」。安装程序会在需要时补装 WebView2 和 Visual C++ 运行库。如果缺少 WebView2，安装时需要联网。升级前先从托盘退出应用。[GitHub Releases](https://github.com/Ling0727-ai/BUCT-Course-Companion/releases) · [Windows 安装包构建记录](https://github.com/Ling0727-ai/BUCT-Course-Companion/actions/workflows/windows.yml)
+正式版本和 `SHA256SUMS.txt` 位于 [GitHub Releases](https://github.com/Ling0727-ai/BUCT-Course-Companion/releases)。开发版可在 [Actions 构建记录](https://github.com/Ling0727-ai/BUCT-Course-Companion/actions/workflows/distribution.yml) 的 **Artifacts** 下载。
+
+| 平台 | 安装包 |
+| --- | --- |
+| Windows 10 1809 或 Windows 11（x64） | `*-Setup-x64.exe` |
+| Linux（兼容 Debian / Ubuntu，amd64） | `*-linux-amd64.deb` |
+| macOS（Apple Silicon） | `*-macos-arm64.pkg` |
+| macOS（Intel） | `*-macos-x86_64.pkg` |
+| Android（arm64） | `*-android-arm64.apk` 或 `*-android-arm64-preview.apk` |
+
+### Windows
+
+双击安装包，从开始菜单打开「北化课伴」。安装程序会在需要时补装 WebView2 和 Visual C++ 运行库。如果缺少 WebView2，安装时需要联网。升级前先从托盘退出应用。
 
 1. 打开 **账户与通知**。可以选择 **在内置页面登录**，也可以保存学号和密码，供会话过期时自动登录。遇到验证码或二次验证时，在学校登录页完成认证。
 2. 在 **课程与待办** 点击 **同步课程**。同步成功后，应用每 3 小时自动刷新，也可以随时手动刷新。应用运行期间每 25 分钟校验一次登录会话，读取学校轮换的 Cookie。如果已知 Cookie 更早过期，则提前校验。会话过期时，应用会用已保存的凭证尝试恢复。
@@ -16,15 +28,9 @@
 
 三个平台使用共用的 Go 桌面和移动界面，提供作业与测试同步、紧急度筛选、回收站、课程详情、个人待办、SQLite 周课表与考试管理。第一次连接学校账号时，可选择用单独的保护密码加密保存凭证。重启后需要解锁。
 
-| 平台 | 安装包 |
-| --- | --- |
-| Linux（Debian / Ubuntu，amd64） | `.deb` |
-| macOS（Apple Silicon 或 Intel） | 对应架构的 `.pkg` |
-| Android（arm64） | `.apk` |
-
 学校页面和附件由系统浏览器打开。应用内同步使用学校账号连接，浏览器完成的验证码或二次验证目前不能回传给同步组件。便携版课表可导入课序 JSON 或 CSV，导出 JSON 和 ICS。Windows 原生版提供 Excel、PDF 和图片导入。Android 会向系统登记未来 36 小时内最早的 60 条提醒，登录保活在应用运行时检查。
 
-安装包由 [多平台构建工作流](https://github.com/Ling0727-ai/BUCT-Course-Companion/actions/workflows/portable.yml) 生成。Android 默认使用独立包名的预览签名。如需正式签名，在 GitHub Actions 设置 `BUCT_ANDROID_KEYSTORE_B64`、`BUCT_ANDROID_STORE_PASSWORD`、`BUCT_ANDROID_KEY_PASSWORD` 和 `BUCT_ANDROID_KEY_ALIAS`。macOS 包使用临时签名以便启动二进制，正式分发需另配 Developer ID 和公证。
+Linux 可用 `sudo apt install ./文件名.deb` 安装并解析依赖。macOS 安装包将应用装入「应用程序」目录，目前未公证。Android 预览版使用独立的应用 ID，可与正式 APK 并存。
 
 ## 任务与提醒
 
@@ -72,8 +78,6 @@ dotnet publish .\desktop\BuctCourseLocal.csproj -c Release --self-contained true
 pwsh -File .\packaging\windows\Build-Installer.ps1 -Version 0.1.0
 ```
 
-推送到 `main` 后，GitHub Actions 会运行 Go 测试、打包并验证安装和卸载。每次运行的 **Artifacts → windows-x64-installer** 提供安装包。推送形如 `v0.1.0` 的版本标签会将同一个 `.exe` 发布到对应的 GitHub Release。
-
 运行 Go 组件测试。
 
 ```powershell
@@ -96,6 +100,19 @@ bash packaging/portable/package-android.sh 0.1.0 1
 | [`course-worker/`](course-worker/) | 学校会话、作业与测验同步、课表校验和提醒计算 |
 | [`packaging/windows/`](packaging/windows/) | Windows 安装包构建和 Inno Setup 配置 |
 | [`course-worker/cmd/buct-portable/`](course-worker/cmd/buct-portable/) | Linux、macOS 和 Android 共用的原生界面 |
+
+## 发布版本
+
+推送到 `main` 或手动运行 **Build and release installers** 会生成五个同版本安装包，构建记录中的 `release-checksums` 提供校验文件。推送形如 `v0.2.0` 的标签后，工作流从标签对应提交构建，逐个验证安装包并上传到同一个 Release 草稿。GitHub 返回的资产摘要与本地 SHA-256 全部一致后，工作流才公开 Release。已公开的安装包由原 Release 保留。
+
+从已通过构建的提交发布时，替换示例版本号后推送标签。
+
+```bash
+git tag -a v0.2.0 -m "北化课伴 v0.2.0"
+git push origin v0.2.0
+```
+
+Android 正式 APK 需要在 GitHub Actions 配齐 `BUCT_ANDROID_KEYSTORE_B64`、`BUCT_ANDROID_STORE_PASSWORD`、`BUCT_ANDROID_KEY_PASSWORD` 和 `BUCT_ANDROID_KEY_ALIAS`。四项均未设置时，版本标签会发布预览 APK。正式 APK 的后续版本需要沿用同一签名密钥。Windows 项目安装包目前未签名，macOS 使用临时签名，Developer ID 签名和公证需另行配置。
 
 ## 来源与许可
 
