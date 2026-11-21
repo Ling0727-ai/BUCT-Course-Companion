@@ -33,7 +33,8 @@ jobs:
             }
             version=${GITHUB_REF_NAME#v}
           else
-            version="0.$((GITHUB_RUN_NUMBER / 1000)).$((GITHUB_RUN_NUMBER % 1000))"
+            # Continue after the last build of the previous Windows workflow (0.1.8).
+            version="0.1.$((8 + GITHUB_RUN_NUMBER))"
           fi
           # Keep Android versionCode increasing from the previous workflows.
           echo "build=$((1000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_OUTPUT"

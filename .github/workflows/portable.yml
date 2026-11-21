@@ -28,7 +28,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          - os: ubuntu-22.04
             platform: linux
             artifact: linux-amd64
           - os: macos-15
@@ -77,6 +77,7 @@ jobs:
         run: |
           scratch=$(mktemp -d)
           installer="$PWD/dist/portable/BUCT-Course-Companion-$VERSION-linux-amd64.deb"
+          dpkg-deb --field "$installer" Depends
           sudo apt-get install -y --no-install-recommends "$installer"
           test "$(dpkg-query -W -f='${Version}' buct-course-companion)" = "$VERSION"
           XDG_CONFIG_HOME="$scratch/config" LIBGL_ALWAYS_SOFTWARE=1 BUCT_PORTABLE_SMOKE=1 \
