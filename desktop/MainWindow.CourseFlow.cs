@@ -7,9 +7,9 @@ namespace BuctCourseLocal;
 internal record CourseFlowSnapshot(long Revision, string Json);
 internal record CourseFlowNotice(string Key, string Title, string Body, long At);
 internal record LegacyCourseFlowEntry(string Id, string Title, long Start, long End, string Location, string Description);
-internal record CourseFlowRequest(JsonElement? State = null, List<LegacyCourseFlowEntry>? Legacy = null, bool Advance = false, string Week = "", bool Export = false);
+internal record CourseFlowRequest(JsonElement? State = null, List<LegacyCourseFlowEntry>? Legacy = null, bool Advance = false, string Week = "", bool Export = false, bool Dashboard = false);
 internal record CourseFlowResult(JsonElement? State, List<CourseFlowNotice>? Reminders, string? Error,
-    ScheduleWeekView? Week = null, List<ScheduleEventView>? Events = null);
+    ScheduleWeekView? Week = null, List<ScheduleEventView>? Events = null, DashboardSchedule? Dashboard = null);
 
 public partial class MainWindow
 {
@@ -64,6 +64,7 @@ public partial class MainWindow
         if (!store.SaveCourseFlow(saved, expected))
             return null;
         UpdateCourseFlowNotices(notices);
+        dashboardSchedule = null;
         return saved;
     }
 

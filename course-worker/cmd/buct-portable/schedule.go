@@ -20,14 +20,35 @@ func mondayOf(t time.Time) time.Time {
 }
 
 func (c *companion) buildSchedule() fyne.CanvasObject {
-	c.week = mondayOf(time.Now())
-	move := func(step int) { c.week = c.week.AddDate(0, 0, step*7); c.renderSchedule() }
-	nav := container.NewGridWithColumns(3, widget.NewButton("上一周", func() { move(-1) }),
-		widget.NewButton("本周", func() { c.week = mondayOf(time.Now()); c.renderSchedule() }), widget.NewButton("下一周", func() { move(1) }))
+	move := func(step int) {
+		if !c.scheduleDayView {
+			step *= 7
+		}
+		c.scheduleDate = c.selectedScheduleDate().AddDate(0, 0, step)
+		c.renderSchedule()
+	}
+	c.schedulePrevious = widget.NewButton("上一周", func() { move(-1) })
+	c.scheduleToday = widget.NewButton("本周", func() { c.scheduleDate = time.Time{}; c.renderSchedule() })
+	c.scheduleNext = widget.NewButton("下一周", func() { move(1) })
+	c.scheduleMode = widget.NewButton("日视图", func() { c.scheduleDayView = !c.scheduleDayView; c.renderSchedule() })
+	nav := container.NewGridWithColumns(4, c.schedulePrevious, c.scheduleToday, c.scheduleNext, c.scheduleMode)
 	edit := container.NewGridWithColumns(3, widget.NewButton("新建课程", func() { c.editLesson("") }),
 		widget.NewButton("新建考试", func() { c.editExam("") }), widget.NewButton("学期与作息", c.editTerm))
 	files := container.NewGridWithColumns(2, widget.NewButton("导入课表", c.importSchedule), widget.NewButton("导出课表", c.exportMenu))
 	return container.NewBorder(container.NewVBox(nav, edit, files), nil, nil, nil, container.NewVScroll(c.schedule))
+}
+
+func (c *companion) selectedScheduleDate() time.Time {
+	if c.scheduleDate.IsZero() {
+		return time.Now()
+	}
+	return c.scheduleDate
+}
+
+func (c *companion) showScheduleDay(date time.Time) {
+	c.scheduleDate = date
+	c.scheduleDayView = true
+	c.tabs.Select(c.scheduleTab)
 }
 
 func (c *companion) renderSchedule() {
@@ -36,11 +57,24 @@ func (c *companion) renderSchedule() {
 		c.setStatus("无法读取本地课表。")
 		return
 	}
-	if c.week.IsZero() {
-		c.week = mondayOf(time.Now())
+	date := c.selectedScheduleDate()
+	monday := mondayOf(date)
+	view := courseflow.ViewWeek(state, monday, time.Now())
+	period := monday.Format("2006/01/02") + "–" + monday.AddDate(0, 0, 6).Format("01/02")
+	previous, today, next, mode := "上一周", "本周", "下一周", "日视图"
+	if c.scheduleDayView {
+		period = date.Format("2006/01/02")
+		previous, today, next, mode = "前一天", "今天", "后一天", "周视图"
 	}
-	view := courseflow.ViewWeek(state, c.week, time.Now())
-	term := state.Settings.TermName + " · " + c.week.Format("01.02") + "–" + c.week.AddDate(0, 0, 6).Format("01.02")
+	c.schedulePrevious.SetText(previous)
+	c.scheduleToday.SetText(today)
+	c.scheduleNext.SetText(next)
+	c.scheduleMode.SetText(mode)
+	term := state.Settings.TermName
+	if week := state.Settings.TermWeek(date); week > 0 {
+		term += fmt.Sprintf(" · 第 %d 周", week)
+	}
+	term += " · " + period
 	head := widget.NewLabelWithStyle(term, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	items := []fyne.CanvasObject{head}
 	if view.Next != nil {
@@ -48,6 +82,9 @@ func (c *companion) renderSchedule() {
 	}
 	var days []fyne.CanvasObject
 	for index, day := range view.Days {
+		if c.scheduleDayView && day.Date != date.Format("2006-01-02") {
+			continue
+		}
 		label := weekNames[index] + " " + day.Date[5:]
 		if day.Today {
 			label += " · 今天"
@@ -83,7 +120,7 @@ func (c *companion) renderSchedule() {
 		}
 		days = append(days, widget.NewCard(label, "", container.NewVBox(entries...)))
 	}
-	if c.mobile {
+	if c.mobile || c.scheduleDayView {
 		items = append(items, days...)
 	} else {
 		items = append(items, container.NewGridWithColumns(7, days...))
@@ -104,6 +141,9 @@ func (c *companion) editLesson(id string) {
 		return
 	}
 	lesson := courseflow.Course{ID: newID("course-"), Day: 1, Start: "08:00", End: "08:45", WeekStart: 1, WeekEnd: state.Settings.Weeks, Parity: "all", Color: "mint"}
+	if c.scheduleDayView {
+		lesson.Day = (int(c.selectedScheduleDate().Weekday())+6)%7 + 1
+	}
 	for _, candidate := range state.Courses {
 		if candidate.ID == id {
 			lesson = candidate
@@ -199,6 +239,9 @@ func (c *companion) editExam(id string) {
 		return
 	}
 	exam := courseflow.Exam{ID: newID("exam-"), Date: time.Now().Format("2006-01-02"), Start: "09:00", End: "11:00"}
+	if c.scheduleDayView {
+		exam.Date = c.selectedScheduleDate().Format("2006-01-02")
+	}
 	for _, item := range state.Exams {
 		if item.ID == id {
 			exam = item

@@ -32,6 +32,12 @@
 
 Linux 可用 `sudo apt install ./文件名.deb` 安装并解析依赖。macOS 安装包将应用装入「应用程序」目录，目前未公证。Android 预览版使用独立的应用 ID，可与正式 APK 并存。
 
+## 查看工作台
+
+- **看今天**。工作台按北京时间显示当前教学周、今日课程和考试，并标出今天的下一节课。点击「打开日课表」查看当天的完整安排。
+- **查截止与考试**。工作台统计未完成和已逾期的任务，列出未来 3 天内最近的截止事项。考试倒计时来自本地课表，点击考试可跳到当天。
+- **打开校园服务**。从「校园入口」在系统浏览器打开 i北化、本科教务、校园邮箱、图书馆、校园卡服务和校园 VPN。需要认证的服务在浏览器里登录，部分服务需连接校园网或校园 VPN。
+
 ## 任务与提醒
 
 - **查任务**。待办按紧急、即将到期、正常和已完成分组。紧急包含 24 小时内截止和未完成的逾期任务。即将到期指剩余超过 24 小时且不超过 3 天。点击统计卡片筛选，可与作业、测验和个人待办类型叠加。
@@ -43,7 +49,7 @@ Linux 可用 `sudo apt install ./文件名.deb` 安装并解析依赖。macOS �
 
 ## 管理课表
 
-在 **课表** 中按周查看课程和考试，点击卡片编辑。课程支持按钟点或节次安排、单双周和单次停课。「学期与作息」可设置节次时间、停课与补课，并开启课程和考试的提前提醒。
+在 **课表** 中切换周视图和日视图。用前后按钮翻周或翻日，点击课程或考试卡片编辑。课程支持按钟点或节次安排、单双周和单次停课。「学期与作息」可设置节次时间、停课与补课，并开启课程和考试的提前提醒。
 
 | 操作 | 支持的文件 |
 | --- | --- |
@@ -117,6 +123,6 @@ Android 正式 APK 需要在 GitHub Actions 配齐 `BUCT_ANDROID_KEYSTORE_B64`�
 ## 来源与许可
 
 - 作业与测验同步复用 `BUCT-course-remind` 的 scraper 和 `go-buct-course` 客户端。[BUCT-course-remind 源码](https://github.com/Ling0727-ai/BUCT-course-remind/tree/6563bba793df487c8ba46bc87e6cae83a3bfabe5/web/go-backend-test/scraper) · [go-buct-course](https://github.com/Ling0727-ai/go-buct-course)
-- 课表数据模型、校历规则、课表版式识别和图标来自 `course-schedule`（课序 / CourseFlow）。浅色磨砂与胶囊导航参考了 BUCT One 的视觉设计。[BUCT One](https://github.com/STAR-10086/buct-one)
+- 课表数据模型、校历规则、课表版式识别和图标来自 `course-schedule`（课序 / CourseFlow）。磨砂界面、胶囊导航和工作台功能参考了 BUCT One。[BUCT One](https://github.com/STAR-10086/buct-one)
 
 项目许可见 [MIT License](LICENSE)。

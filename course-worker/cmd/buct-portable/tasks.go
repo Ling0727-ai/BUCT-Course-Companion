@@ -87,6 +87,9 @@ func urgencyOf(item portable.Task, now int64) string {
 }
 
 func (c *companion) renderTasks() {
+	if c.dashboardVisible() {
+		c.renderDashboard()
+	}
 	items, err := c.store.Tasks()
 	if err != nil {
 		c.setStatus("无法读取本地任务。")

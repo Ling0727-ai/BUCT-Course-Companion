@@ -11,14 +11,7 @@ public partial class MainWindow
     private BrowseRequest? queuedBrowse;
     private BrowseRequest? browseAfterLogin;
 
-    private void ShowCatalog()
-    {
-        Board.Visibility = Visibility.Collapsed;
-        BrowserPanel.Visibility = Visibility.Collapsed;
-        SchedulePanel.Visibility = Visibility.Collapsed;
-        CatalogPanel.Visibility = Visibility.Visible;
-        HighlightNav(CatalogButton);
-    }
+    private void ShowCatalog() => ShowPage(CatalogPanel, CatalogButton);
 
     private async void Catalog_Click(object sender, RoutedEventArgs e)
     {

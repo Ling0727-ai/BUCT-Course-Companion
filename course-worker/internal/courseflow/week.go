@@ -28,6 +28,50 @@ type EventView struct {
 	Exam     bool   `json:"exam"`
 }
 
+type DashboardView struct {
+	TermName string      `json:"term_name"`
+	TermWeek int         `json:"term_week"`
+	Today    DayView     `json:"today"`
+	Exams    []EventView `json:"exams"`
+}
+
+// ViewDashboard summarizes the local timetable for the current campus day.
+func ViewDashboard(state State, now time.Time) DashboardView {
+	date := now.Format("2006-01-02")
+	view := DashboardView{
+		TermName: state.Settings.TermName,
+		TermWeek: state.Settings.TermWeek(now),
+		Today:    DayView{Date: date, Today: true, Entries: eventsOn(state, now)},
+		Exams:    []EventView{},
+	}
+	stamp := now.Format("2006-01-02 15:04")
+	for _, exam := range state.Exams {
+		entry := exam.event()
+		if entry.Date+" "+entry.Start > stamp {
+			view.Exams = append(view.Exams, entry)
+		}
+	}
+	sort.SliceStable(view.Exams, func(i, j int) bool {
+		a, b := view.Exams[i], view.Exams[j]
+		return a.Date+" "+a.Start < b.Date+" "+b.Start
+	})
+	if len(view.Exams) > 3 {
+		view.Exams = view.Exams[:3]
+	}
+	return view
+}
+
+func (e Exam) event() EventView {
+	return EventView{ID: e.ID, Name: e.Name, Date: e.Date, Start: clockLabel(e.Start), End: clockLabel(e.End), Location: e.Location, Exam: true}
+}
+
+func clockLabel(clock string) string {
+	if len(clock) == len("9:00") {
+		return "0" + clock
+	}
+	return clock
+}
+
 // ViewWeek returns the seven days of a week and the next upcoming event.
 func ViewWeek(state State, monday, now time.Time) *WeekView {
 	view := &WeekView{}
@@ -54,12 +98,12 @@ func eventsOn(state State, date time.Time) []EventView {
 	items := []EventView{}
 	for _, c := range state.Courses {
 		if state.OccursOn(c, date) {
-			items = append(items, EventView{ID: c.ID, Name: c.Name, Date: key, Start: c.Start, End: c.End, Location: c.Location, Teacher: c.Teacher, Color: c.Color})
+			items = append(items, EventView{ID: c.ID, Name: c.Name, Date: key, Start: clockLabel(c.Start), End: clockLabel(c.End), Location: c.Location, Teacher: c.Teacher, Color: c.Color})
 		}
 	}
 	for _, e := range state.Exams {
 		if e.Date == key {
-			items = append(items, EventView{ID: e.ID, Name: e.Name, Date: key, Start: e.Start, End: e.End, Location: e.Location, Exam: true})
+			items = append(items, e.event())
 		}
 	}
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Start < items[j].Start })

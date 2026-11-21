@@ -74,7 +74,7 @@ public partial class MainWindow : Window
         Closing += HideToTray;
         Closed += DisposeWindow;
         UpdateBoard();
-        ShowBoard();
+        ShowPage(DashboardPanel, DashboardButton);
         Loaded += (_, _) =>
         {
             if (timer.IsEnabled)
@@ -95,6 +95,8 @@ public partial class MainWindow : Window
         {
             if (Now >= nextUrgencyChange)
                 FilterTasks();
+            if (DashboardPanel.IsVisible)
+                RefreshDashboard();
             var taskNotified = NoticesOn && NotifyDue();
             TickCourseFlow(canShow: !taskNotified);
             if (!busy && openDialogs == 0 && afterLogin is null && (account is not null || savedCookies.Count > 0))
@@ -151,6 +153,8 @@ public partial class MainWindow : Window
         UpdateAccountStatus();
         NoticeStatus.Text = NoticesOn ? "截止通知已开启" : "截止通知已暂停";
         FilterTasks();
+        if (DashboardPanel.IsVisible)
+            RenderDashboardTasks();
     }
 
     private void UpdateAccountStatus() => AccountStatus.Text = account is not null ? "已保存学校登录凭证" :
@@ -638,27 +642,15 @@ public partial class MainWindow : Window
         }
     }, browserOperation: true);
 
-    private void ShowBrowser()
-    {
-        Board.Visibility = Visibility.Collapsed;
-        CatalogPanel.Visibility = Visibility.Collapsed;
-        SchedulePanel.Visibility = Visibility.Collapsed;
-        BrowserPanel.Visibility = Visibility.Visible;
-        HighlightNav(PortalButton);
-    }
+    private void ShowBrowser() => ShowPage(BrowserPanel, PortalButton);
 
-    private void ShowBoard()
-    {
-        BrowserPanel.Visibility = Visibility.Collapsed;
-        CatalogPanel.Visibility = Visibility.Collapsed;
-        SchedulePanel.Visibility = Visibility.Collapsed;
-        Board.Visibility = Visibility.Visible;
-        HighlightNav(BoardButton);
-    }
+    private void ShowBoard() => ShowPage(Board, BoardButton);
 
-    private void HighlightNav(Button active)
+    private void ShowPage(FrameworkElement page, Button active)
     {
-        foreach (var button in new[] { BoardButton, CatalogButton, ScheduleButton, PortalButton })
+        foreach (var panel in new FrameworkElement[] { DashboardPanel, Board, CatalogPanel, SchedulePanel, BrowserPanel })
+            panel.Visibility = panel == page ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var button in new[] { DashboardButton, BoardButton, CatalogButton, ScheduleButton, PortalButton })
             button.Tag = button == active ? "Selected" : null;
     }
 

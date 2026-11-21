@@ -72,7 +72,8 @@ public partial class MainWindow
         var name = Field("课程名称", existing?.Name);
         var location = Field("上课地点", existing?.Location);
         var teacher = Field("教师", existing?.Teacher);
-        var day = Choices("星期", Enumerable.Range(1, 7).Select(ScheduleDates.DayName), (existing?.Day ?? ScheduleDates.DayNumber(ScheduleDates.Today)) - 1);
+        var defaultDate = scheduleDayView ? scheduleDate ?? ScheduleDates.Today : ScheduleDates.Today;
+        var day = Choices("星期", Enumerable.Range(1, 7).Select(ScheduleDates.DayName), (existing?.Day ?? ScheduleDates.DayNumber(defaultDate)) - 1);
         var basis = Choices("时间方式", ["按钟点", "按节次"], existing is { PeriodStart: > 0, PeriodEnd: > 0 } ? 1 : 0);
         var start = Field("开始时间或起始节次", basis.SelectedIndex == 1 ? existing!.PeriodStart.ToString() : existing?.Start ?? state.Settings.Periods[0].Start);
         var end = Field("结束时间或结束节次", basis.SelectedIndex == 1 ? existing!.PeriodEnd.ToString() : existing?.End ?? state.Settings.Periods[0].End);
@@ -136,7 +137,8 @@ public partial class MainWindow
             return;
         var dialog = new EditDialog(this, existing is null ? "新建考试" : "编辑考试");
         var name = Field("考试名称", existing?.Name);
-        var date = new DatePicker { SelectedDate = (existing is null ? ScheduleDates.Today : ScheduleDates.Parse(existing.Date)).ToDateTime(TimeOnly.MinValue) };
+        var defaultDate = scheduleDayView ? scheduleDate ?? ScheduleDates.Today : ScheduleDates.Today;
+        var date = new DatePicker { SelectedDate = (existing is null ? defaultDate : ScheduleDates.Parse(existing.Date)).ToDateTime(TimeOnly.MinValue) };
         dialog.AddField("考试日期", date);
         var start = Field("开始时间（HH:mm）", existing?.Start ?? "09:00");
         var end = Field("结束时间（HH:mm）", existing?.End ?? "11:00");

@@ -10,19 +10,21 @@ import (
 )
 
 type Request struct {
-	State   json.RawMessage `json:"state"`
-	Legacy  []LegacyEvent   `json:"legacy"`
-	Advance bool            `json:"advance"`
-	Week    string          `json:"week"`
-	Export  bool            `json:"export"`
+	State     json.RawMessage `json:"state"`
+	Legacy    []LegacyEvent   `json:"legacy"`
+	Advance   bool            `json:"advance"`
+	Week      string          `json:"week"`
+	Export    bool            `json:"export"`
+	Dashboard bool            `json:"dashboard"`
 }
 
 type Reply struct {
-	State     *State      `json:"state,omitempty"`
-	Reminders []Notice    `json:"reminders,omitempty"`
-	Error     string      `json:"error,omitempty"`
-	Week      *WeekView   `json:"week,omitempty"`
-	Events    []EventView `json:"events,omitempty"`
+	State     *State         `json:"state,omitempty"`
+	Reminders []Notice       `json:"reminders,omitempty"`
+	Error     string         `json:"error,omitempty"`
+	Week      *WeekView      `json:"week,omitempty"`
+	Events    []EventView    `json:"events,omitempty"`
+	Dashboard *DashboardView `json:"dashboard,omitempty"`
 }
 
 type Notice struct {
@@ -57,6 +59,10 @@ func Run(request Request, now time.Time) Reply {
 		state.Courses = []Course{}
 	}
 	reply := Reply{State: &state, Reminders: UpcomingNotices(state, now)}
+	if request.Dashboard {
+		view := ViewDashboard(state, now)
+		reply.Dashboard = &view
+	}
 	if request.Week != "" {
 		monday, err := time.ParseInLocation("2006-01-02", request.Week, now.Location())
 		if err != nil || monday.Weekday() != time.Monday {
@@ -73,8 +79,7 @@ func Run(request Request, now time.Time) Reply {
 		for _, exam := range state.Exams {
 			day, _ := time.ParseInLocation("2006-01-02", exam.Date, now.Location())
 			if day.Before(first) || !day.Before(end) {
-				reply.Events = append(reply.Events, EventView{ID: exam.ID, Name: exam.Name, Date: exam.Date, Start: exam.Start,
-					End: exam.End, Location: exam.Location, Exam: true})
+				reply.Events = append(reply.Events, exam.event())
 			}
 		}
 	}

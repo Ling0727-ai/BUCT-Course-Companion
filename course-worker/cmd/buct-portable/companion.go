@@ -18,26 +18,32 @@ import (
 )
 
 type companion struct {
-	app                      fyne.App
-	win                      fyne.Window
-	store                    *portable.Store
-	mobile                   bool
-	status, accountStatus    *widget.Label
-	tasks, courses, schedule *fyne.Container
-	account                  portable.Account
-	cookies                  []course.Cookie
-	busy                     bool
-	taskKind, urgency        string
-	includeDone              bool
-	week                     time.Time
-	nextSync                 time.Time
-	nextSessionCheck         time.Time
-	stopOnce                 sync.Once
-	stopped                  chan struct{}
+	app                                 fyne.App
+	win                                 fyne.Window
+	store                               *portable.Store
+	mobile                              bool
+	status, accountStatus               *widget.Label
+	dashboard, tasks, courses, schedule *fyne.Container
+	tabs                                *container.AppTabs
+	dashboardTab, scheduleTab           *container.TabItem
+	dashboardMinute                     int64
+	account                             portable.Account
+	cookies                             []course.Cookie
+	busy                                bool
+	taskKind, urgency                   string
+	includeDone                         bool
+	scheduleDate                        time.Time
+	scheduleDayView                     bool
+	schedulePrevious, scheduleToday     *widget.Button
+	scheduleNext, scheduleMode          *widget.Button
+	nextSync                            time.Time
+	nextSessionCheck                    time.Time
+	stopOnce                            sync.Once
+	stopped                             chan struct{}
 }
 
 func newCompanion(a fyne.App, w fyne.Window, s *portable.Store, mobile bool) *companion {
-	return &companion{app: a, win: w, store: s, mobile: mobile, status: wrap(""), accountStatus: wrap(""), tasks: container.NewVBox(),
+	return &companion{app: a, win: w, store: s, mobile: mobile, status: wrap(""), accountStatus: wrap(""), dashboard: container.NewVBox(), tasks: container.NewVBox(),
 		courses: container.NewVBox(), schedule: container.NewVBox(), taskKind: "全部", urgency: "全部", stopped: make(chan struct{})}
 }
 
@@ -54,20 +60,23 @@ func scroll(children ...fyne.CanvasObject) *container.Scroll {
 func (c *companion) content() fyne.CanvasObject {
 	board := container.NewTabItemWithIcon("待办", theme.CheckButtonIcon(), c.buildTasks())
 	classes := container.NewTabItemWithIcon("课程", theme.ListIcon(), c.buildCourses())
-	schedule := container.NewTabItemWithIcon("课表", theme.CalendarIcon(), c.buildSchedule())
+	c.scheduleTab = container.NewTabItemWithIcon("课表", theme.CalendarIcon(), c.buildSchedule())
 	settings := container.NewTabItemWithIcon("设置", theme.SettingsIcon(), c.buildAccount())
-	tabs := container.NewAppTabs(board, classes, schedule, settings)
+	c.dashboardTab = container.NewTabItemWithIcon("工作台", theme.HomeIcon(), c.buildDashboard(func() { c.tabs.Select(board) }))
+	c.tabs = container.NewAppTabs(c.dashboardTab, board, classes, c.scheduleTab, settings)
 	if c.mobile {
-		tabs.SetTabLocation(container.TabLocationBottom)
+		c.tabs.SetTabLocation(container.TabLocationBottom)
 	}
-	tabs.OnSelected = func(tab *container.TabItem) {
+	c.tabs.OnSelected = func(tab *container.TabItem) {
 		c.setStatus("")
 		switch tab {
+		case c.dashboardTab:
+			c.renderDashboard()
 		case board:
 			c.renderTasks()
 		case classes:
 			c.renderCourses()
-		case schedule:
+		case c.scheduleTab:
 			c.renderSchedule()
 		case settings:
 			c.updateAccount()
@@ -77,7 +86,7 @@ func (c *companion) content() fyne.CanvasObject {
 	c.renderCourses()
 	c.renderSchedule()
 	c.updateAccount()
-	return container.NewBorder(nil, c.status, nil, nil, tabs)
+	return container.NewBorder(nil, c.status, nil, nil, c.tabs)
 }
 
 func (c *companion) setStatus(value string) {
@@ -111,11 +120,14 @@ func (c *companion) tick() {
 		return
 	default:
 	}
+	now := time.Now()
+	if c.dashboardVisible() && c.dashboardMinute != now.Unix()/60 {
+		c.renderDashboard()
+	}
 	c.checkNotices()
 	if c.account.StudentID == "" || c.busy {
 		return
 	}
-	now := time.Now()
 	if !now.Before(c.nextSync) {
 		c.syncTasks()
 	} else if !now.Before(c.nextSessionCheck) {

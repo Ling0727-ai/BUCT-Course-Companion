@@ -145,7 +145,8 @@
             <TextBlock Text="北化课程提醒" Foreground="{StaticResource Ink}" FontSize="19" FontWeight="SemiBold" />
             <TextBlock Text="北京化工大学" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,4,0,0" />
           </StackPanel>
-          <Button x:Name="BoardButton" Style="{StaticResource NavButton}" Click="Board_Click" AutomationProperties.Name="课程与待办"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE80F;" /><TextBlock Text="课程与待办" /></StackPanel></Button>
+          <Button x:Name="DashboardButton" Style="{StaticResource NavButton}" Click="Dashboard_Click" AutomationProperties.Name="工作台"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE80F;" /><TextBlock Text="工作台" /></StackPanel></Button>
+          <Button x:Name="BoardButton" Style="{StaticResource NavButton}" Click="Board_Click" AutomationProperties.Name="课程与待办"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE9D5;" /><TextBlock Text="课程与待办" /></StackPanel></Button>
           <Button x:Name="CatalogButton" Style="{StaticResource NavButton}" Click="Catalog_Click" AutomationProperties.Name="我的课程"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE82D;" /><TextBlock Text="我的课程" /></StackPanel></Button>
           <Button x:Name="ScheduleButton" Style="{StaticResource NavButton}" Click="Schedule_Click" AutomationProperties.Name="课表"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE787;" /><TextBlock Text="课表" /></StackPanel></Button>
           <Button x:Name="PortalButton" Style="{StaticResource NavButton}" Click="Portal_Click" AutomationProperties.Name="打开课程平台"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE774;" /><TextBlock Text="打开课程平台" /></StackPanel></Button>
@@ -161,6 +162,82 @@
     </Border>
     <Grid Grid.Column="1" Margin="23,24,23,18">
       <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+      <ScrollViewer x:Name="DashboardPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="0,0,6,6">
+          <TextBlock Text="工作台" Style="{StaticResource PageTitle}" />
+          <TextBlock x:Name="DashboardDate" Foreground="{StaticResource Muted}" Margin="0,5,0,16" TextWrapping="Wrap" />
+          <Grid Margin="0,0,0,12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <Border Style="{StaticResource MetricCard}">
+              <StackPanel>
+                <DockPanel Margin="0,0,0,8">
+                  <Button DockPanel.Dock="Right" Click="Dashboard_Today" Padding="8,4">打开日课表</Button>
+                  <TextBlock Text="今日安排" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </DockPanel>
+                <TextBlock x:Name="DashboardTodayHint" Text="正在读取课表…" Foreground="{StaticResource Muted}" TextWrapping="Wrap" />
+                <ItemsControl x:Name="DashboardToday">
+                  <ItemsControl.ItemTemplate><DataTemplate>
+                    <StackPanel Margin="0,0,0,8">
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding Detail}" Foreground="{StaticResource Muted}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </DataTemplate></ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Style="{StaticResource MetricCard}">
+              <StackPanel>
+                <TextBlock Text="近期考试" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,10" />
+                <TextBlock x:Name="DashboardExamHint" Foreground="{StaticResource Muted}" TextWrapping="Wrap" />
+                <ItemsControl x:Name="DashboardExams">
+                  <ItemsControl.ItemTemplate><DataTemplate>
+                    <Button Click="Dashboard_Exam" HorizontalContentAlignment="Stretch" Padding="8,5" Margin="0,0,0,6">
+                      <StackPanel>
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Detail}" Foreground="{StaticResource Muted}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Button>
+                  </DataTemplate></ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </Grid>
+          <Border Style="{StaticResource MetricCard}" Margin="0,0,0,12">
+            <StackPanel>
+              <DockPanel Margin="0,0,0,7">
+                <Button DockPanel.Dock="Right" Click="Board_Click" Padding="8,4">打开待办</Button>
+                <TextBlock Text="近期截止" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
+              </DockPanel>
+              <TextBlock x:Name="DashboardTaskSummary" Foreground="{StaticResource Muted}" TextWrapping="Wrap" />
+              <ItemsControl x:Name="DashboardTasks" Margin="0,6,0,0">
+                <ItemsControl.ItemTemplate><DataTemplate>
+                  <DockPanel Margin="0,0,0,7">
+                    <Button DockPanel.Dock="Right" DataContext="{Binding Task}" Click="Task_Open" Padding="8,5" Margin="8,0,0,0"
+                            Content="{Binding OpenLabel}" IsEnabled="{Binding DataContext.CanOpen, RelativeSource={RelativeSource AncestorType=DockPanel}}" />
+                    <StackPanel>
+                      <TextBlock Text="{Binding Task.Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding Detail}" Foreground="{StaticResource Muted}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </DockPanel>
+                </DataTemplate></ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource MetricCard}">
+            <StackPanel>
+              <TextBlock Text="校园入口" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,8" />
+              <WrapPanel>
+                <Button Click="CampusLink_Click" Tag="https://i.buct.edu.cn/" Margin="0,0,6,5">i北化 ↗</Button>
+                <Button Click="CampusLink_Click" Tag="https://jwglxt.buct.edu.cn/" Margin="0,0,6,5">本科教务 ↗</Button>
+                <Button Click="CampusLink_Click" Tag="https://mail.buct.edu.cn/" Margin="0,0,6,5">校园邮箱 ↗</Button>
+                <Button Click="CampusLink_Click" Tag="https://library.buct.edu.cn/" Margin="0,0,6,5">图书馆 ↗</Button>
+                <Button Click="CampusLink_Click" Tag="https://cit.buct.edu.cn/ykt_7863/list.htm" Margin="0,0,6,5">校园卡服务 ↗</Button>
+                <Button Click="CampusLink_Click" Tag="https://w.buct.edu.cn/" Margin="0,0,0,5">校园 VPN ↗</Button>
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
       <Grid x:Name="Board">
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" />
@@ -322,9 +399,10 @@
           <DockPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
               <Button Click="Schedule_Manage" Padding="8,5" Margin="0,0,9,0">全部课程与考试</Button>
-              <Button Click="Schedule_Week" Tag="-1" Padding="8,5" Margin="0,0,5,0" AutomationProperties.Name="上一周">‹</Button>
-              <Button Click="Schedule_Today" Padding="9,5" Margin="0,0,5,0">本周</Button>
-              <Button Click="Schedule_Week" Tag="1" Padding="8,5" AutomationProperties.Name="下一周">›</Button>
+              <Button x:Name="ScheduleViewButton" Click="Schedule_SwitchView" Padding="8,5" Margin="0,0,9,0">日视图</Button>
+              <Button x:Name="SchedulePrevious" Click="Schedule_Move" Tag="-1" Padding="8,5" Margin="0,0,5,0" AutomationProperties.Name="上一周">‹</Button>
+              <Button x:Name="ScheduleTodayButton" Click="Schedule_Today" Padding="9,5" Margin="0,0,5,0">本周</Button>
+              <Button x:Name="ScheduleNextButton" Click="Schedule_Move" Tag="1" Padding="8,5" AutomationProperties.Name="下一周">›</Button>
             </StackPanel>
             <StackPanel VerticalAlignment="Center">
               <TextBlock x:Name="ScheduleWeekLabel" FontWeight="SemiBold" />
@@ -335,7 +413,7 @@
         <TextBlock x:Name="CourseFlowStatus" Grid.Row="2" Foreground="{StaticResource Muted}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
         <ScrollViewer x:Name="ScheduleScroller" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
           <ItemsControl x:Name="ScheduleDays" Width="{Binding ViewportWidth, ElementName=ScheduleScroller}" MinWidth="600" Margin="0,0,0,6">
-            <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="7" Rows="1" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="{Binding Tag, RelativeSource={RelativeSource AncestorType=ItemsControl}, FallbackValue=7}" Rows="1" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <Border Style="{StaticResource FrostedPanel}" CornerRadius="14" Margin="0,0,5,0" MinHeight="175">

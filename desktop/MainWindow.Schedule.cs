@@ -5,7 +5,8 @@ namespace BuctCourseLocal;
 
 public partial class MainWindow
 {
-    private DateOnly? scheduleMonday;
+    private DateOnly? scheduleDate;
+    private bool scheduleDayView;
     private ScheduleState? scheduleState;
     private int scheduleRenderVersion;
 
@@ -13,33 +14,46 @@ public partial class MainWindow
 
     private async Task ShowCourseFlowAsync()
     {
-        Board.Visibility = Visibility.Collapsed;
-        CatalogPanel.Visibility = Visibility.Collapsed;
-        BrowserPanel.Visibility = Visibility.Collapsed;
-        SchedulePanel.Visibility = Visibility.Visible;
-        HighlightNav(ScheduleButton);
+        ShowPage(SchedulePanel, ScheduleButton);
         await RenderScheduleAsync();
     }
 
     private async void Schedule_Today(object sender, RoutedEventArgs e)
     {
-        scheduleMonday = null;
+        scheduleDate = null;
         await RenderScheduleAsync();
     }
 
-    private async void Schedule_Week(object sender, RoutedEventArgs e)
+    private async void Schedule_Move(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string direction } || !int.TryParse(direction, out var step))
             return;
-        scheduleMonday = (scheduleMonday ?? ScheduleDates.Monday(ScheduleDates.Today)).AddDays(step * 7);
+        scheduleDate = (scheduleDate ?? ScheduleDates.Today).AddDays(step * (scheduleDayView ? 1 : 7));
+        await RenderScheduleAsync();
+    }
+
+    private async void Schedule_SwitchView(object sender, RoutedEventArgs e)
+    {
+        scheduleDayView = !scheduleDayView;
         await RenderScheduleAsync();
     }
 
     private async Task RenderScheduleAsync()
     {
         var version = ++scheduleRenderVersion;
-        var monday = scheduleMonday ?? ScheduleDates.Monday(ScheduleDates.Today);
-        ScheduleWeekLabel.Text = $"{monday:yyyy/MM/dd} – {monday.AddDays(6):MM/dd}";
+        var date = scheduleDate ?? ScheduleDates.Today;
+        var monday = ScheduleDates.Monday(date);
+        var dayView = scheduleDayView;
+        ScheduleDays.Tag = dayView ? 1 : 7;
+        ScheduleDays.MinWidth = dayView ? 0 : 600;
+        ScheduleViewButton.Content = dayView ? "周视图" : "日视图";
+        ScheduleTodayButton.Content = dayView ? "今天" : "本周";
+        System.Windows.Automation.AutomationProperties.SetName(SchedulePrevious, dayView ? "前一天" : "上一周");
+        System.Windows.Automation.AutomationProperties.SetName(ScheduleNextButton, dayView ? "后一天" : "下一周");
+        ScheduleWeekLabel.Text = dayView ? $"{date:yyyy/MM/dd} · {ScheduleDates.DayName(ScheduleDates.DayNumber(date))}"
+            : $"{monday:yyyy/MM/dd} – {monday.AddDays(6):MM/dd}";
+        ScheduleDays.ItemsSource = null;
+        ScheduleNext.Text = "";
         CourseFlowStatus.Text = "正在读取课表…";
         try
         {
@@ -55,6 +69,8 @@ public partial class MainWindow
             var week = ScheduleDates.TermWeek(settings, monday);
             ScheduleTerm.Text = week is > 0 && week <= settings.Weeks ? $"{settings.TermName} · 第 {week} 周" : settings.TermName;
             var days = result.Week?.Days ?? [];
+            if (dayView)
+                days = days.Where(day => day.Date == ScheduleDates.Iso(date)).ToList();
             var exceptions = (settings.CalendarExceptions ?? []).ToDictionary(rule => rule.Date);
             ScheduleDays.ItemsSource = days.Select(day => exceptions.TryGetValue(day.Date, out var rule) ? day with
             {

@@ -70,17 +70,26 @@ func DefaultState() State {
 	return State{Courses: []Course{}, Settings: Settings{TermName: "我的学期", TermStart: now.AddDate(0, 0, -offset).Format("2006-01-02"), Weeks: 20, Minutes: 10, Periods: []PeriodTime{{"08:00", "08:45"}, {"08:55", "09:40"}, {"10:00", "10:45"}, {"10:55", "11:40"}, {"11:50", "12:35"}, {"14:00", "14:45"}, {"14:55", "15:40"}, {"16:00", "16:45"}, {"16:55", "17:40"}, {"19:00", "19:45"}, {"19:55", "20:40"}, {"20:50", "21:35"}}}}
 }
 
-func (s State) OccursOn(c Course, date time.Time) bool {
-	start, err := time.Parse("2006-01-02", s.Settings.TermStart)
+// TermWeek returns zero for dates outside the configured term.
+func (s Settings) TermWeek(date time.Time) int {
+	start, err := time.Parse("2006-01-02", s.TermStart)
 	if err != nil {
-		return false
+		return 0
 	}
 	civil := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
 	if civil.Before(start) {
-		return false
+		return 0
 	}
 	week := int(civil.Sub(start).Hours()/24)/7 + 1
-	if week > s.Settings.Weeks || week < c.WeekStart || week > c.WeekEnd || c.Parity == "odd" && week%2 == 0 || c.Parity == "even" && week%2 == 1 {
+	if week > s.Weeks {
+		return 0
+	}
+	return week
+}
+
+func (s State) OccursOn(c Course, date time.Time) bool {
+	week := s.Settings.TermWeek(date)
+	if week == 0 || week < c.WeekStart || week > c.WeekEnd || c.Parity == "odd" && week%2 == 0 || c.Parity == "even" && week%2 == 1 {
 		return false
 	}
 	day := (int(date.Weekday())+6)%7 + 1

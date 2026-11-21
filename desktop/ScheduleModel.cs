@@ -16,6 +16,8 @@ internal record ScheduleSettings([property: JsonPropertyName("term_name")] strin
     [property: JsonPropertyName("term_start")] string TermStart, int Weeks, bool Reminder, int Minutes, List<SchedulePeriod> Periods,
     [property: JsonPropertyName("calendar_exceptions")] List<ScheduleException>? CalendarExceptions);
 internal record ScheduleWeekView(List<ScheduleDayView> Days, ScheduleEventView? Next);
+internal record DashboardSchedule([property: JsonPropertyName("term_name")] string TermName,
+    [property: JsonPropertyName("term_week")] int TermWeek, ScheduleDayView Today, List<ScheduleEventView> Exams);
 internal record ScheduleDayView(string Date, bool Today, List<ScheduleEventView> Entries)
 {
     public string DayLabel => ScheduleDates.DayName(ScheduleDates.DayNumber(ScheduleDates.Parse(Date)));
@@ -38,5 +40,9 @@ internal static class ScheduleDates
     internal static DateOnly Today => DateOnly.FromDateTime(CourseTask.BeijingTime(DateTimeOffset.UtcNow.ToUnixTimeSeconds()).DateTime);
     internal static DateOnly Parse(string date) => DateOnly.ParseExact(date, "yyyy-MM-dd", CultureInfo.InvariantCulture);
     internal static string Iso(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-    internal static int TermWeek(ScheduleSettings settings, DateOnly date) => (date.DayNumber - Parse(settings.TermStart).DayNumber) / 7 + 1;
+    internal static int TermWeek(ScheduleSettings settings, DateOnly date)
+    {
+        var elapsed = date.DayNumber - Parse(settings.TermStart).DayNumber;
+        return elapsed < 0 ? 0 : elapsed / 7 + 1;
+    }
 }
