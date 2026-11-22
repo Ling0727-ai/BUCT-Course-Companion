@@ -40,6 +40,7 @@ public partial class MainWindow : Window
     private bool busy;
     private bool exiting;
     private int openDialogs;
+    private Func<Task>? statusRetry;
 
     public MainWindow(string dataDir)
     {
@@ -55,7 +56,7 @@ public partial class MainWindow : Window
         {
             store.EndSession(false);
             account = null;
-            Status.Text = "无法读取已保存的凭证。请重新登录课程平台。";
+            SetStatus("无法读取已保存的凭证。请重新登录课程平台。");
         }
 
         var menu = new Forms.ContextMenuStrip();
@@ -88,6 +89,7 @@ public partial class MainWindow : Window
 
     private static long Now => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
     private bool NoticesOn => store.Setting("notifications", 1) == 1;
+    private bool HasSavedCourseSession => savedCookies.Any(c => CourseService.IsCourseDomain(c.Domain));
 
     private void Tick()
     {
@@ -99,7 +101,7 @@ public partial class MainWindow : Window
                 RefreshDashboard();
             var taskNotified = NoticesOn && NotifyDue();
             TickCourseFlow(canShow: !taskNotified);
-            if (!busy && openDialogs == 0 && afterLogin is null && (account is not null || savedCookies.Count > 0))
+            if (!busy && openDialogs == 0 && afterLogin is null && (account is not null || HasSavedCourseSession))
             {
                 if (Now >= nextSync)
                     _ = RefreshAsync(false);
@@ -110,7 +112,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Trace.TraceError("Reminder timer failed: {0}", ex.GetType().Name);
-            Status.Text = "读取本地提醒失败。";
+            SetStatus("读取本地提醒失败。");
         }
     }
 
@@ -158,7 +160,20 @@ public partial class MainWindow : Window
     }
 
     private void UpdateAccountStatus() => AccountStatus.Text = account is not null ? "已保存学校登录凭证" :
-        savedCookies.Count > 0 ? "已保存课程会话" : "尚未登录课程平台";
+        HasSavedCourseSession ? "已保存课程会话" : savedCookies.Count > 0 ? "已保存学校认证会话" : "尚未登录课程平台";
+
+    private void SetStatus(string message, Func<Task>? retry = null)
+    {
+        statusRetry = retry;
+        Status.Text = message;
+        StatusRetryButton.Visibility = retry is null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private async void StatusRetry_Click(object sender, RoutedEventArgs e)
+    {
+        if (!busy && statusRetry is { } retry)
+            await retry();
+    }
 
     private void FilterTasks()
     {
@@ -187,18 +202,18 @@ public partial class MainWindow : Window
         nextUrgencyChange = matchingKind.Select(t => UrgencyBand.NextChange(t, now)).DefaultIfEmpty(long.MaxValue).Min();
     }
 
-    private async Task RunAsync(string message, Func<Task> action, bool browserOperation = false)
+    private async Task RunAsync(string message, Func<Task> action, bool browserOperation = false, Func<Task>? retry = null)
     {
         if (busy || exiting)
         {
             if (!exiting)
-                Status.Text = "正在处理课程请求，请稍候。";
+                SetStatus("正在处理课程请求，请稍候。", statusRetry);
             return;
         }
         busy = true;
         SyncButton.IsEnabled = false;
         if (message.Length > 0)
-            Status.Text = message;
+            SetStatus(message);
         try
         {
             await action();
@@ -248,11 +263,14 @@ public partial class MainWindow : Window
         void ShowOperationError(string error)
         {
             if (browserOperation)
-                SetBrowserFeedback(error);
+                SetBrowserFeedback(error, retry: campusPage is not null);
             else
-                Status.Text = error;
+                SetStatus(error, retry);
         }
     }
+
+    private Task RetrySyncAsync() => RefreshAsync(true);
+    private Task RetrySessionAsync() => KeepSessionAsync(interactive: true);
 
     private Task RefreshAsync(bool interactive) => RunAsync("正在同步作业和测试…", async () =>
     {
@@ -260,39 +278,40 @@ public partial class MainWindow : Window
         {
             syncAfterLogin = true;
             ShowBrowser();
-            Status.Text = "完成学校认证后将同步课程。";
+            SetStatus("完成学校认证后将同步课程。");
             return;
         }
         nextSync = Now + 15 * 60;
+        var request = openRequest;
         await EnsureBrowserAsync();
         var result = await RunCourseAsync("sync", account, await ReadCookiesAsync());
         if (result.NeedsLogin)
         {
             nextSync = Now + 3 * 3600;
             nextSessionCheck = Now + 25 * 60;
-            Status.Text = result.Error ?? "课程会话已失效，请在课程平台登录。";
-            if (interactive)
+            SetStatus(result.Error ?? "课程会话已失效，请在课程平台登录。", RetrySyncAsync);
+            if (interactive && request == openRequest)
                 BeginBrowserLogin(new Uri(CourseService.HomeUrl), true);
             return;
         }
         await ApplyCourseSessionAsync(result);
         SaveSyncResult(result);
-    });
+    }, retry: RetrySyncAsync);
 
     private void SaveSyncResult(CourseResult result)
     {
         if (result.Error is { } error)
         {
-            Status.Text = error;
+            SetStatus(error, RetrySyncAsync);
             return;
         }
         var incomplete = result.IncompleteKinds ?? [];
         store.SaveSnapshot(result.Tasks ?? [], incomplete, Now);
         nextSync = Now + (result.Warning is null ? 3 * 3600 : 15 * 60);
         UpdateBoard();
-        Status.Text = result.Warning is { } warning
+        SetStatus(result.Warning is { } warning
             ? $"已读取 {result.Tasks?.Count ?? 0} 项课程任务。{warning}，已保留相关缓存。"
-            : $"同步完成，共 {result.Tasks?.Count ?? 0} 项课程任务。";
+            : $"同步完成，共 {result.Tasks?.Count ?? 0} 项课程任务。", result.Warning is null ? null : RetrySyncAsync);
         if (NoticesOn)
             NotifyDue();
     }
@@ -379,10 +398,11 @@ public partial class MainWindow : Window
         web!.Navigate(target.AbsoluteUri);
     }
 
-    private void SetBrowserFeedback(string message, bool loading = false)
+    private void SetBrowserFeedback(string message, bool loading = false, bool retry = false)
     {
         BrowserFeedback.Text = message;
         BrowserProgress.Visibility = loading ? Visibility.Visible : Visibility.Collapsed;
+        CampusRetryButton.Visibility = retry ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private async Task WarmBrowserAsync()
@@ -421,12 +441,12 @@ public partial class MainWindow : Window
         web.Settings.AreHostObjectsAllowed = false;
         web.Settings.IsPasswordAutosaveEnabled = false;
         web.Settings.IsGeneralAutofillEnabled = false;
-        var current = await ReadCookiesAsync();
+        var current = await ReadCookiesAsync(includeIdentity: true);
         var missing = savedCookies.Where(saved => !current.Any(c => c.Name == saved.Name && c.Domain == saved.Domain && c.Path == saved.Path));
         await ApplyCookiesAsync(missing, persist: false);
         web.NavigationStarting += (_, args) =>
         {
-            if (Uri.TryCreate(args.Uri, UriKind.Absolute, out var uri) && CourseService.IsSchoolUri(uri))
+            if (Uri.TryCreate(args.Uri, UriKind.Absolute, out var uri) && IsBrowserUri(uri))
             {
                 if (uri.Host == CourseService.Host && uri.AbsolutePath.Equals(CourseService.LegacyHomePath, StringComparison.OrdinalIgnoreCase))
                 {
@@ -436,6 +456,8 @@ public partial class MainWindow : Window
                 }
                 BrowserHost.Text = uri.Host;
                 activeNavigation = args.NavigationId;
+                if (campusPage is not null && CourseService.IsIdentityDomain(uri.Host))
+                    campusSawIdentity = true;
                 if (requestedCoursePage is { } target && uri.Host is ("portal.buct.edu.cn" or "sidportal.buct.edu.cn"))
                 {
                     afterLogin = target;
@@ -447,12 +469,17 @@ public partial class MainWindow : Window
                 return;
             }
             args.Cancel = true;
-            SetBrowserFeedback("此窗口仅打开学校的 HTTPS 页面。");
+            SetBrowserFeedback("此链接超出了当前校园服务的浏览范围。", retry: campusPage is not null);
         };
         web.NavigationCompleted += async (_, args) =>
         {
             if (exiting || args.NavigationId != activeNavigation)
                 return;
+            if (campusPage is { } page)
+            {
+                await CompleteCampusNavigationAsync(args, page);
+                return;
+            }
             if (afterLogin is not null && CourseService.TaskUri(web.Source) is { } uri &&
                 (!uri.AbsolutePath.Equals(new Uri(CourseService.LoginUrl).AbsolutePath, StringComparison.OrdinalIgnoreCase) || uri.Query.Length > 0))
             {
@@ -486,7 +513,7 @@ public partial class MainWindow : Window
         web.NewWindowRequested += (_, args) =>
         {
             args.Handled = true;
-            if (Uri.TryCreate(args.Uri, UriKind.Absolute, out var uri) && CourseService.IsSchoolUri(uri))
+            if (Uri.TryCreate(args.Uri, UriKind.Absolute, out var uri) && IsBrowserUri(uri))
                 web.Navigate(uri.AbsoluteUri);
         };
 
@@ -504,10 +531,10 @@ public partial class MainWindow : Window
         catch (System.Runtime.InteropServices.COMException) { return false; }
     }
 
-    private async Task<List<CourseCookie>> ReadCookiesAsync(string url = "")
+    private async Task<List<CourseCookie>> ReadCookiesAsync(string url = "", bool includeIdentity = false)
     {
         var cookies = await web!.CookieManager.GetCookiesAsync(url);
-        return cookies.Where(c => CourseService.IsCourseDomain(c.Domain)).Select(c =>
+        return cookies.Where(c => CourseService.IsCourseDomain(c.Domain) || (includeIdentity && CourseService.IsIdentityDomain(c.Domain))).Select(c =>
             new CourseCookie(c.Name, c.Value, c.Domain, c.Path,
                 c.IsSession ? 0 : new DateTimeOffset(c.Expires.ToUniversalTime()).ToUnixTimeSeconds(),
                 c.IsSecure, c.IsHttpOnly, c.SameSite.ToString())).ToList();
@@ -517,20 +544,29 @@ public partial class MainWindow : Window
         string courseId = "", string itemId = "") =>
         CourseService.RunAsync(mode, credentials, cookies, web!.Settings.UserAgent, quit.Token, courseId, itemId);
 
-    private Task KeepSessionAsync() => RunAsync("", async () =>
+    private Task KeepSessionAsync(bool interactive = false) => RunAsync(interactive ? "正在校验课程会话…" : "", async () =>
     {
         nextSessionCheck = Now + 2 * 60;
+        var request = openRequest;
         await EnsureBrowserAsync();
         var result = await RunCourseAsync("session", account, await ReadCookiesAsync());
         if (result.NeedsLogin)
         {
             nextSessionCheck = Now + 25 * 60;
-            Status.Text = result.Error ?? "课程会话已过期，请打开课程平台完成认证。";
+            SetStatus(result.Error ?? "课程会话已过期，请打开课程平台完成认证。", RetrySessionAsync);
+            if (interactive && request == openRequest)
+                BeginBrowserLogin(new Uri(CourseService.HomeUrl), false);
             return;
         }
-        if (result.Error is null)
-            await ApplyCourseSessionAsync(result);
-    });
+        if (result.Error is { } error)
+        {
+            SetStatus(error, RetrySessionAsync);
+            return;
+        }
+        await ApplyCourseSessionAsync(result);
+        if (interactive || statusRetry == RetrySessionAsync)
+            SetStatus("课程会话有效。");
+    }, retry: RetrySessionAsync);
 
     private async Task ApplyCourseSessionAsync(CourseResult result)
     {
@@ -545,7 +581,9 @@ public partial class MainWindow : Window
                     manager.DeleteCookie(cookie);
             }
         }
-        await ApplyCookiesAsync(result.Cookies);
+        var cookies = (result.Cookies ?? []).Where(c => CourseService.IsCourseDomain(c.Domain))
+            .Concat((result.IdentityCookies ?? []).Where(c => CourseService.IsIdentityDomain(c.Domain)));
+        await ApplyCookiesAsync(cookies);
         if (result.NewSession)
             sessionGeneration++;
     }
@@ -555,7 +593,7 @@ public partial class MainWindow : Window
         var manager = web!.CookieManager;
         foreach (var item in updates ?? [])
         {
-            if (!CourseService.IsCourseDomain(item.Domain))
+            if (!CourseService.IsCourseDomain(item.Domain) && !CourseService.IsIdentityDomain(item.Domain))
                 continue;
             if (item.Expires != 0 && item.Expires <= Now)
             {
@@ -564,7 +602,7 @@ public partial class MainWindow : Window
             }
             var cookie = manager.CreateCookie(item.Name, item.Value, item.Domain, item.Path);
             cookie.IsHttpOnly = item.HttpOnly;
-            cookie.IsSecure = item.Secure;
+            cookie.IsSecure = item.Secure || CourseService.IsIdentityDomain(item.Domain);
             if (item.Expires > 0)
                 cookie.Expires = DateTimeOffset.FromUnixTimeSeconds(item.Expires).UtcDateTime;
             if (Enum.TryParse<CoreWebView2CookieSameSiteKind>(item.SameSite, out var sameSite))
@@ -572,11 +610,17 @@ public partial class MainWindow : Window
             manager.AddOrUpdateCookie(cookie);
         }
         if (persist)
-        {
-            savedCookies = await ReadCookiesAsync();
-            store.SaveSecret("cookies", savedCookies);
-            UpdateAccountStatus();
-        }
+            await PersistBrowserCookiesAsync();
+    }
+
+    private async Task PersistBrowserCookiesAsync(long? request = null)
+    {
+        var cookies = await ReadCookiesAsync(includeIdentity: true);
+        if (exiting || (request.HasValue && request != openRequest))
+            return;
+        savedCookies = cookies;
+        store.SaveSecret("cookies", savedCookies);
+        UpdateAccountStatus();
     }
 
     private void BeginBrowserLogin(Uri target, bool sync)
@@ -633,7 +677,7 @@ public partial class MainWindow : Window
         {
             var syncResult = await RunCourseAsync("sync", null, await ReadCookiesAsync());
             if (syncResult.NeedsLogin)
-                Status.Text = "会话已失效，请重新登录。";
+                SetStatus("会话已失效，请重新登录。", RetrySyncAsync);
             else
             {
                 await ApplyCourseSessionAsync(syncResult);
@@ -642,12 +686,22 @@ public partial class MainWindow : Window
         }
     }, browserOperation: true);
 
-    private void ShowBrowser() => ShowPage(BrowserPanel, PortalButton);
+    private void ShowBrowser()
+    {
+        ResetCampusPage();
+        ShowPage(BrowserPanel, PortalButton);
+    }
 
     private void ShowBoard() => ShowPage(Board, BoardButton);
 
     private void ShowPage(FrameworkElement page, Button active)
     {
+        if (page != BrowserPanel && campusPage is not null)
+        {
+            openRequest++;
+            ResetCampusPage();
+            web?.Stop();
+        }
         foreach (var panel in new FrameworkElement[] { DashboardPanel, Board, CatalogPanel, SchedulePanel, BrowserPanel })
             panel.Visibility = panel == page ? Visibility.Visible : Visibility.Collapsed;
         foreach (var button in new[] { DashboardButton, BoardButton, CatalogButton, ScheduleButton, PortalButton })

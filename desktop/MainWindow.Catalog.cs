@@ -17,7 +17,7 @@ public partial class MainWindow
     {
         ShowCatalog();
         LoadCatalog();
-        if (store.CourseCache<List<CatalogCourse>>("catalog") is null && (account is not null || savedCookies.Count > 0) && afterLogin is null)
+        if (store.CourseCache<List<CatalogCourse>>("catalog") is null && (account is not null || HasSavedCourseSession) && afterLogin is null)
             await BrowseAsync(new BrowseRequest("catalog", "catalog"));
     }
 
@@ -114,16 +114,19 @@ public partial class MainWindow
         if (busy)
         {
             queuedBrowse = request;
-            Status.Text = "当前同步结束后将读取所选内容。";
+            SetStatus("当前同步结束后将读取所选内容。");
             return Task.CompletedTask;
         }
 
         return RunAsync("正在读取课程平台…", async () =>
         {
+            var navigation = openRequest;
             await EnsureBrowserAsync();
             var result = await RunCourseAsync(request.Mode, account, await ReadCookiesAsync(), request.CourseId, request.ItemId);
             if (result.NeedsLogin)
             {
+                if (navigation != openRequest)
+                    return;
                 browseAfterLogin = request;
                 if (afterLogin is null)
                     BeginBrowserLogin(new Uri(CourseService.HomeUrl), false);
@@ -134,7 +137,7 @@ public partial class MainWindow
             await ApplyCourseSessionAsync(result);
             if (result.Error is { } error)
             {
-                Status.Text = error;
+                SetStatus(error, () => BrowseAsync(request));
                 if (request.FallbackText.Length > 0 && IsBrowseVisible(request))
                     ShowItemDetail(request, EmptyDetail(request.FallbackText));
                 return;
@@ -161,8 +164,8 @@ public partial class MainWindow
                 if (IsBrowseVisible(request) && queuedBrowse is null)
                     ShowItemDetail(request, detail);
             }
-            Status.Text = result.Warning ?? "读取完成。";
-        });
+            SetStatus(result.Warning ?? "读取完成。");
+        }, retry: () => BrowseAsync(request));
     }
 
     private bool IsBrowseVisible(BrowseRequest request) => request.FromCatalog ?

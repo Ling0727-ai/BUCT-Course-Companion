@@ -19,7 +19,7 @@ public partial class MainWindow
         }
         Option(account is null ? "保存学号与密码" : "更新学校密码", "account", !busy);
         Option("在内置页面登录", "browser", !busy);
-        Option("退出学校账号并清除课程缓存", "logout", !busy && (account is not null || savedCookies.Count > 0 || afterLogin is not null));
+        Option("退出学校账号并清除课程缓存", "logout", !busy);
         Option("导入旧版 MongoDB 导出文件", "import", !busy);
         dialog.AddDescription("关闭窗口后应用会留在 Windows 托盘，继续发送截止提醒。彻底退出后提醒暂停。");
         var enabled = new CheckBox { Content = "启用截止前 24 / 12 / 1 小时通知", IsChecked = NoticesOn, Margin = new Thickness(0, 10, 0, 4) };
@@ -41,7 +41,7 @@ public partial class MainWindow
                 {
                     await EnsureBrowserAsync();
                     BeginBrowserLogin(new Uri(CourseService.HomeUrl), true);
-                    Status.Text = "请在内置页面完成学校认证。";
+                    SetStatus("请在内置页面完成学校认证。");
                 });
                 break;
             case "logout":
@@ -52,7 +52,7 @@ public partial class MainWindow
                 noticeOpensSchedule = false;
                 noticeTarget = null;
                 tray.ShowBalloonTip(7000, "北化课程提醒", "Windows 通知测试。点击返回任务列表。", Forms.ToolTipIcon.Info);
-                Status.Text = "测试通知已提交给 Windows。";
+                SetStatus("测试通知已提交给 Windows。");
                 break;
             case "import":
                 await ImportLegacyAsync();
@@ -93,7 +93,7 @@ public partial class MainWindow
         var result = await RunCourseAsync("login", credentials, []);
         if (result.NeedsLogin || result.Error is not null)
         {
-            Status.Text = result.Error ?? "验证失败，请在内置页面完成学校认证。";
+            SetStatus(result.Error ?? "验证失败，请在内置页面完成学校认证。");
             if (result.NeedsLogin)
                 BeginBrowserLogin(new Uri(CourseService.HomeUrl), true);
             return;
@@ -105,12 +105,12 @@ public partial class MainWindow
         afterLogin = null;
         LoginBanner.Visibility = Visibility.Collapsed;
         UpdateBoard();
-        Status.Text = "凭证已加密保存，正在同步课程…";
+        SetStatus("凭证已加密保存，正在同步课程…");
         nextSync = Now + 15 * 60;
         var sync = await RunCourseAsync("sync", null, await ReadCookiesAsync());
         if (sync.NeedsLogin)
         {
-            Status.Text = "已保存凭证，请在内置页面重新登录。";
+            SetStatus("已保存凭证，请在内置页面重新登录。", RetrySyncAsync);
             return;
         }
         await ApplyCourseSessionAsync(sync);
@@ -132,12 +132,13 @@ public partial class MainWindow
         LoadCatalog();
         ShowBoard();
         UpdateBoard();
-        Status.Text = "已退出课程平台。";
+        SetStatus("已清除学校会话和课程缓存。");
     });
 
     private async Task ClearBrowserSessionAsync()
     {
         openRequest++;
+        ResetCampusPage();
         requestedCoursePage = null;
         queuedRecovery = null;
         activeNavigation = 0;
@@ -164,11 +165,11 @@ public partial class MainWindow
                 store.ImportTasks(imported);
                 UpdateBoard();
                 ShowBoard();
-                Status.Text = $"导入完成，处理了 {imported.Count} 条任务，已有记录保留。";
+                SetStatus($"导入完成，处理了 {imported.Count} 条任务，已有记录保留。");
             }
             catch (Exception ex) when (ex is FormatException or System.Text.Json.JsonException)
             {
-                Status.Text = "导入失败。请选择同一用户的 course_data、todos 和 assignment_status 文件。";
+                SetStatus("导入失败。请选择同一用户的 course_data、todos 和 assignment_status 文件。");
             }
         });
     }

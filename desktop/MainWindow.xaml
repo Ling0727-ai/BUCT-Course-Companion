@@ -227,12 +227,12 @@
             <StackPanel>
               <TextBlock Text="校园入口" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,8" />
               <WrapPanel>
-                <Button Click="CampusLink_Click" Tag="https://i.buct.edu.cn/" Margin="0,0,6,5">i北化 ↗</Button>
-                <Button Click="CampusLink_Click" Tag="https://jwglxt.buct.edu.cn/" Margin="0,0,6,5">本科教务 ↗</Button>
-                <Button Click="CampusLink_Click" Tag="https://mail.buct.edu.cn/" Margin="0,0,6,5">校园邮箱 ↗</Button>
-                <Button Click="CampusLink_Click" Tag="https://library.buct.edu.cn/" Margin="0,0,6,5">图书馆 ↗</Button>
-                <Button Click="CampusLink_Click" Tag="https://cit.buct.edu.cn/ykt_7863/list.htm" Margin="0,0,6,5">校园卡服务 ↗</Button>
-                <Button Click="CampusLink_Click" Tag="https://w.buct.edu.cn/" Margin="0,0,0,5">校园 VPN ↗</Button>
+                <Button Click="CampusLink_Click" Tag="portal" Margin="0,0,6,5">i北化</Button>
+                <Button Click="CampusLink_Click" Tag="academic" Margin="0,0,6,5">本科教务</Button>
+                <Button Click="CampusLink_Click" Tag="mail" Margin="0,0,6,5">校园邮箱</Button>
+                <Button Click="CampusLink_Click" Tag="library" Margin="0,0,6,5">图书馆</Button>
+                <Button Click="CampusLink_Click" Tag="card" Margin="0,0,6,5">校园卡服务</Button>
+                <Button Click="CampusLink_Click" Tag="vpn" Margin="0,0,0,5">校园 VPN</Button>
               </WrapPanel>
             </StackPanel>
           </Border>
@@ -475,11 +475,12 @@
         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
         <DockPanel Margin="0,0,0,12">
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button x:Name="CampusBackButton" Click="Dashboard_Click" Visibility="Collapsed" Margin="0,0,8,0">返回工作台</Button>
             <Button Click="Browser_Back" Margin="0,0,8,0">返回上一页</Button>
             <Button Click="Browser_Reload">重新加载</Button>
           </StackPanel>
           <StackPanel>
-            <TextBlock Text="课程平台" Style="{StaticResource PageTitle}" />
+            <TextBlock x:Name="BrowserTitle" Text="课程平台" Style="{StaticResource PageTitle}" />
             <TextBlock x:Name="BrowserHost" Foreground="{StaticResource Muted}" />
           </StackPanel>
         </DockPanel>
@@ -491,7 +492,10 @@
         </Border>
         <StackPanel Grid.Row="2" Margin="0,0,0,7">
           <ProgressBar x:Name="BrowserProgress" Height="3" IsIndeterminate="True" Visibility="Collapsed" Foreground="{StaticResource Accent}" />
-          <TextBlock x:Name="BrowserFeedback" Foreground="{StaticResource Muted}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+          <DockPanel>
+            <Button x:Name="CampusRetryButton" DockPanel.Dock="Right" Click="CampusRetry_Click" Visibility="Collapsed" Padding="8,4" Margin="8,0,0,0">重试</Button>
+            <TextBlock x:Name="BrowserFeedback" Foreground="{StaticResource Muted}" TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite" />
+          </DockPanel>
         </StackPanel>
         <Border Grid.Row="3" Style="{StaticResource FrostedPanel}" Padding="8">
           <web:WebView2 x:Name="CourseView" />
@@ -504,7 +508,11 @@
             <Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=Status}" Value=""><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
           </Style>
         </Border.Style>
-        <TextBlock x:Name="Status" TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="12" AutomationProperties.LiveSetting="Polite" />
+        <DockPanel>
+          <Button x:Name="StatusRetryButton" Click="StatusRetry_Click" DockPanel.Dock="Right" IsEnabled="{Binding IsEnabled, ElementName=SyncButton}"
+                  Visibility="Collapsed" Padding="8,4" Margin="8,0,0,0">重试</Button>
+          <TextBlock x:Name="Status" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{StaticResource Muted}" FontSize="12" AutomationProperties.LiveSetting="Polite" />
+        </DockPanel>
       </Border>
     </Grid>
   </Grid>

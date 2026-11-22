@@ -10,7 +10,8 @@ internal record CourseRequest(string Mode, string? StudentId, string? Password, 
     string CourseId, string ItemId);
 internal record CourseResult(List<CourseTask>? Tasks, List<CourseCookie>? Cookies, bool NeedsLogin, string? Error,
     bool NewSession = false, List<string>? IncompleteKinds = null, string? Warning = null,
-    List<CatalogCourse>? Courses = null, List<CatalogEntry>? Entries = null, ItemDetail? Detail = null, long SessionCheckAt = 0);
+    List<CatalogCourse>? Courses = null, List<CatalogEntry>? Entries = null, ItemDetail? Detail = null, long SessionCheckAt = 0,
+    List<CourseCookie>? IdentityCookies = null);
 
 internal static class CourseService
 {
@@ -24,12 +25,23 @@ internal static class CourseService
 
     internal static bool IsCourseDomain(string domain) => domain.TrimStart('.').ToLowerInvariant() is Host or "buct.edu.cn";
 
+    internal static bool IsIdentityDomain(string domain) => domain.TrimStart('.').ToLowerInvariant() is
+        "portal.buct.edu.cn" or "sidportal.buct.edu.cn";
+
+    internal static bool IsIdentityLogin(Uri uri) => IsSchoolUri(uri) &&
+        ((uri.Host, uri.AbsolutePath) is ("sidportal.buct.edu.cn", "/login") or ("portal.buct.edu.cn", "/cas/login") ||
+         (uri.Host, uri.AbsolutePath) is ("portal.buct.edu.cn", "/") &&
+         !string.IsNullOrEmpty(System.Web.HttpUtility.ParseQueryString(uri.Query)["service"]));
+
     internal static Uri? TaskUri(string? raw) =>
         Uri.TryCreate(raw, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps &&
         uri.IsDefaultPort && uri.Host == Host && uri.UserInfo.Length == 0 ? uri : null;
 
-    internal static bool IsSchoolUri(Uri uri) => uri.Scheme == Uri.UriSchemeHttps && uri.IsDefaultPort &&
-        uri.UserInfo.Length == 0 && (uri.Host == "buct.edu.cn" || uri.Host.EndsWith(".buct.edu.cn", StringComparison.Ordinal));
+    internal static bool IsSchoolUri(Uri uri) => IsHttps(uri) &&
+        (uri.Host == "buct.edu.cn" || uri.Host.EndsWith(".buct.edu.cn", StringComparison.Ordinal));
+
+    internal static bool IsHttps(Uri uri) => uri.IsAbsoluteUri && uri.Scheme == Uri.UriSchemeHttps && uri.IsDefaultPort &&
+        uri.UserInfo.Length == 0;
 
     internal static string ReadCourseId(string raw)
     {

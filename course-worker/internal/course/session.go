@@ -51,6 +51,7 @@ type Request struct {
 type Result struct {
 	Tasks           []Task          `json:"tasks,omitempty"`
 	Cookies         []Cookie        `json:"cookies,omitempty"`
+	IdentityCookies []Cookie        `json:"identityCookies,omitempty"`
 	IncompleteKinds []string        `json:"incompleteKinds,omitempty"`
 	Warning         string          `json:"warning,omitempty"`
 	NeedsLogin      bool            `json:"needsLogin,omitempty"`
@@ -73,6 +74,7 @@ func courseDomain(domain string) bool {
 
 type courseTransport struct {
 	updates        map[[3]string]Cookie
+	identity       map[[3]string]Cookie
 	check          bool
 	pageErr        error
 	userAgent      string
@@ -80,29 +82,39 @@ type courseTransport struct {
 }
 
 func (t *courseTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if t.userAgent != "" && req.URL.Scheme == "https" && req.URL.User == nil {
-		switch req.URL.Host {
-		case host, "portal.buct.edu.cn", "sidportal.buct.edu.cn":
-			req = req.Clone(req.Context())
-			req.Header.Set("User-Agent", t.userAgent)
-		}
+	secureOrigin := req.URL.Scheme == "https" && req.URL.User == nil
+	identityOrigin := secureOrigin && (req.URL.Host == "portal.buct.edu.cn" || req.URL.Host == "sidportal.buct.edu.cn")
+	courseOrigin := secureOrigin && req.URL.Host == host
+	if t.userAgent != "" && (courseOrigin || identityOrigin) {
+		req = req.Clone(req.Context())
+		req.Header.Set("User-Agent", t.userAgent)
 	}
 	resp, err := http.DefaultTransport.RoundTrip(req)
 	if err != nil {
 		t.recordFailure(err)
 		return nil, err
 	}
-	if !strings.EqualFold(req.URL.Host, host) || req.URL.Scheme != "https" {
+	if identityOrigin && !t.check {
+		recordCookies(t.identity, req, resp, func(domain string) bool {
+			return strings.TrimPrefix(domain, ".") == req.URL.Host
+		})
+	}
+	if !courseOrigin {
 		return resp, nil
 	}
+	recordCookies(t.updates, req, resp, courseDomain)
+	return t.checkCourseResponse(req, resp)
+}
+
+func recordCookies(updates map[[3]string]Cookie, req *http.Request, resp *http.Response, allowed func(string) bool) {
 	for _, c := range resp.Cookies() {
 		domain := strings.ToLower(c.Domain)
 		if domain == "" {
-			domain = host
+			domain = req.URL.Host
 		} else {
 			domain = "." + strings.TrimPrefix(domain, ".")
 		}
-		if !courseDomain(domain) {
+		if !allowed(domain) {
 			continue
 		}
 		cookiePath := c.Path
@@ -130,11 +142,14 @@ func (t *courseTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		case http.SameSiteNoneMode:
 			sameSite = "None"
 		}
-		t.updates[[3]string{c.Name, domain, cookiePath}] = Cookie{
+		updates[[3]string{c.Name, domain, cookiePath}] = Cookie{
 			Name: c.Name, Value: c.Value, Domain: domain, Path: cookiePath,
 			Expires: expires, Secure: c.Secure, HTTPOnly: c.HttpOnly, SameSite: sameSite,
 		}
 	}
+}
+
+func (t *courseTransport) checkCourseResponse(req *http.Request, resp *http.Response) (*http.Response, error) {
 	if !t.check {
 		// Older authentication redirects can still name the retired student home.
 		if resp.StatusCode >= 300 && resp.StatusCode < 400 {
@@ -227,7 +242,7 @@ func newTransport(agent string) *courseTransport {
 	if strings.ContainsAny(agent, "\r\n") {
 		agent = ""
 	}
-	return &courseTransport{updates: make(map[[3]string]Cookie), userAgent: agent}
+	return &courseTransport{updates: make(map[[3]string]Cookie), identity: make(map[[3]string]Cookie), userAgent: agent}
 }
 
 func checkRedirect(req *http.Request, history []*http.Request) error {
@@ -327,6 +342,11 @@ func Run(request Request) Result {
 	}
 	for _, cookie := range transport.updates {
 		result.Cookies = append(result.Cookies, cookie)
+	}
+	if newSession {
+		for _, cookie := range transport.identity {
+			result.IdentityCookies = append(result.IdentityCookies, cookie)
+		}
 	}
 	previous := request.Cookies
 	if newSession {

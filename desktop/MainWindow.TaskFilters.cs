@@ -32,7 +32,7 @@ public partial class MainWindow
         UpdateBoard();
         if (CatalogPanel.Visibility == Visibility.Visible)
             RenderCourseItems();
-        Status.Text = enabled ? "已更新，随时可从隐藏与回收站恢复。" : "已恢复选中的记录。";
+        SetStatus(enabled ? "已更新，随时可从隐藏与回收站恢复。" : "已恢复选中的记录。");
     }
 
     private void ManageFilters_Click(object sender, RoutedEventArgs e)

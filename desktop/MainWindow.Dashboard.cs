@@ -138,12 +138,4 @@ public partial class MainWindow
         scheduleDate = ScheduleDates.Parse(exam.Date);
         await ShowCourseFlowAsync();
     }
-
-    private void CampusLink_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { Tag: string url })
-            return;
-        try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
-        catch (System.ComponentModel.Win32Exception) { Status.Text = "无法打开系统浏览器。"; }
-    }
 }

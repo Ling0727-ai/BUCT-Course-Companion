@@ -109,7 +109,7 @@ public partial class MainWindow
                 return false;
             dialog.Close();
             await RenderScheduleAsync();
-            Status.Text = message;
+            SetStatus(message);
             return true;
         }
         catch (Exception ex)

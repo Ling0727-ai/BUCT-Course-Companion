@@ -103,7 +103,7 @@ public partial class MainWindow
                 content = Csv(["节次", "开始时间", "结束时间"], state.Settings.Periods.Select((p, i) => new[] { (i + 1).ToString(), p.Start, p.End }));
             await File.WriteAllTextAsync(picker.FileName, content, new UTF8Encoding(picker.FilterIndex != 1), quit.Token);
             if (!exiting)
-                Status.Text = "课表已导出。";
+                SetStatus("课表已导出。");
         }
         catch (Exception ex)
         {

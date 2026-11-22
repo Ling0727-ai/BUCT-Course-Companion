@@ -28,6 +28,9 @@ func TestSyncUsesWebViewCookieAndReturnsRotatedSession(t *testing.T) {
 		if c, err := req.Cookie("JSESSIONID"); err != nil || c.Value != want {
 			t.Fatal("WebView session was not sent to the course platform")
 		}
+		if _, err := req.Cookie("TGC"); err == nil {
+			t.Fatal("the identity session must not be sent to the course platform")
+		}
 		if req.UserAgent() != browserUA {
 			t.Fatalf("request used UA %q", req.UserAgent())
 		}
@@ -37,7 +40,8 @@ func TestSyncUsesWebViewCookieAndReturnsRotatedSession(t *testing.T) {
 		}
 		return response, nil
 	})
-	result := Run(Request{Mode: "sync", Cookies: []Cookie{courseCookie()}, UserAgent: browserUA})
+	identity := Cookie{Name: "TGC", Value: "identity-session", Domain: "sidportal.buct.edu.cn", Path: "/", Secure: true}
+	result := Run(Request{Mode: "sync", Cookies: []Cookie{courseCookie(), identity}, UserAgent: browserUA})
 	if result.NeedsLogin || result.Error != "" || len(result.Tasks) != 0 || requests != 3 {
 		t.Fatalf("expected a successful empty snapshot, got %+v", result)
 	}
@@ -45,6 +49,35 @@ func TestSyncUsesWebViewCookieAndReturnsRotatedSession(t *testing.T) {
 		Name: "JSESSIONID", Value: "rotated", Domain: host, Path: "/meol", Secure: true, HTTPOnly: true, SameSite: "Lax",
 	}) {
 		t.Fatalf("incorrect rotating session attributes: %+v", result.Cookies)
+	}
+}
+
+func TestIdentityCookiesStaySeparateAndKeepTheirIssuer(t *testing.T) {
+	original := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = original })
+	http.DefaultTransport = testRoundTripper(func(req *http.Request) (*http.Response, error) {
+		response := responsePage(req, "")
+		response.Header.Add("Set-Cookie", "TGC=identity-session; Path=/; Secure; HttpOnly; SameSite=Lax")
+		response.Header.Add("Set-Cookie", "wrong=cross-origin; Domain=course.buct.edu.cn; Path=/")
+		response.Header.Add("Set-Cookie", "parent=overbroad; Domain=buct.edu.cn; Path=/")
+		return response, nil
+	})
+	transport := newTransport("")
+	for _, address := range []string{"https://sidportal.buct.edu.cn/login", "http://portal.buct.edu.cn/cas/login", "https://i.buct.edu.cn/"} {
+		req, err := http.NewRequest(http.MethodGet, address, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := transport.RoundTrip(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+	key := [3]string{"TGC", "sidportal.buct.edu.cn", "/"}
+	want := Cookie{Name: "TGC", Value: "identity-session", Domain: key[1], Path: "/", Secure: true, HTTPOnly: true, SameSite: "Lax"}
+	if len(transport.identity) != 1 || transport.identity[key] != want || len(transport.updates) != 0 {
+		t.Fatal("identity cookies were mixed with course cookies or accepted from the wrong origin")
 	}
 }
 
