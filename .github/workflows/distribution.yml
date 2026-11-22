@@ -85,8 +85,8 @@ jobs:
 
   release:
     name: Publish all installers together
-    if: github.ref_type == 'tag'
-    needs: verify
+    if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+    needs: [metadata, verify]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -107,4 +107,10 @@ jobs:
       - name: Stage, verify and publish the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash packaging/release/publish.sh "$GITHUB_REF_NAME" release-assets
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            bash packaging/release/publish.sh "$GITHUB_REF_NAME" release-assets
+          else
+            bash packaging/release/publish.sh "dev-$VERSION" release-assets "$GITHUB_SHA"
+          fi

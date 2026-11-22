@@ -4,7 +4,7 @@
 
 ## 开始使用
 
-正式版本和 `SHA256SUMS.txt` 位于 [GitHub Releases](https://github.com/Ling0727-ai/BUCT-Course-Companion/releases)。开发版可在 [Actions 构建记录](https://github.com/Ling0727-ai/BUCT-Course-Companion/actions/workflows/distribution.yml) 的 **Artifacts** 下载。
+正式版、开发预览版和 `SHA256SUMS.txt` 均可在 [GitHub Releases](https://github.com/Ling0727-ai/BUCT-Course-Companion/releases) 下载。开发预览版使用 `dev-` 开头的标签。
 
 | 平台 | 安装包 |
 | --- | --- |
@@ -109,7 +109,7 @@ bash packaging/portable/package-android.sh 0.1.0 1
 
 ## 发布版本
 
-推送到 `main` 或手动运行 **Build and release installers** 会生成五个同版本安装包，构建记录中的 `release-checksums` 提供校验文件。推送形如 `v0.2.0` 的标签后，工作流从标签对应提交构建，逐个验证安装包并上传到同一个 Release 草稿。GitHub 返回的资产摘要与本地 SHA-256 全部一致后，工作流才公开 Release。已公开的安装包由原 Release 保留。
+推送到 `main` 或在 `main` 上手动运行 **Build and release installers** 后，每次成功构建都会发布一条 `dev-` 开发预览 Release，包含五个同版本安装包和 `SHA256SUMS.txt`。推送形如 `v0.2.0` 的标签会从对应提交构建正式版。两个流程都先上传到 Release 草稿，等 GitHub 返回的资产摘要与本地 SHA-256 全部一致后再公开。已公开的安装包由原 Release 保留。
 
 从已通过构建的提交发布时，替换示例版本号后推送标签。
 
